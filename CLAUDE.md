@@ -64,6 +64,8 @@ Repo: `HelmutQualtinger/LaSilla`; GitHub Pages serves `main` from the repo root 
 
 **Phones.** `MOBILE` (coarse pointer or small screen) halves the site texture, shadow map and baked Milky Way sizes and caps the pixel ratio at 1.5. Below 720 px wide (or 460 px tall) the CSS hides the hint and credit and turns `#tools` and `#list` into dropdowns opened by two corner buttons, `#bList` top left (`body.list-open`) and `#bMenu` top right (`body.menu-open`); only one is open at a time, and tapping the scene or picking a building closes them; every feature must stay reachable from a button because there is no keyboard. Test the phone layout by loading the page in a 390 px wide `<iframe>` — resizing the automation window does not change the viewport. A classic `<script>` after `#loading` writes start-up errors (failed CDN load, no WebGL, exceptions) into the loading overlay.
 
+**Looking up.** `OrbitControls` can only look at the sky by putting the camera below its pivot. `maxPolarAngle` is almost π, and the ground clamp in `tick` handles the rest: when the camera reaches the ground while level or looking up, it lifts camera and pivot together and pulls the pivot to 30 m from the camera, so further tilting turns the view up to the zenith in place. When the camera is clearly above the pivot (normal orbit grazing a hill) only the camera is lifted. `controls._rotateUp(angle)` is handy for testing this without a mouse.
+
 **Frame loop.** `frame()` only schedules; `tick(dt)` does the work (transition, sky rotation, fly-to animation, WASD movement, `controls.update()`, ground clamp, label projection with overlap culling).
 
 ## Licensing

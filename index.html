@@ -353,7 +353,7 @@ scene.fog = new THREE.FogExp2(FOG_DAY.clone(), 3.4e-5);
 const camera = new THREE.PerspectiveCamera(52, 1, 2, 120000);
 const controls = new OrbitControls(camera, canvas);
 controls.autoRotateSpeed = 2;                // one orbit in about 30 s
-Object.assign(controls, { enableDamping: true, dampingFactor: .08, minDistance: 8, maxDistance: 22000, maxPolarAngle: Math.PI * .96, zoomToCursor: true, screenSpacePanning: false });
+Object.assign(controls, { enableDamping: true, dampingFactor: .08, minDistance: 8, maxDistance: 22000, maxPolarAngle: Math.PI - .01, zoomToCursor: true, screenSpacePanning: false });
 
 const SUN = new THREE.Vector3(-.50, .58, -.64).normalize();                 // afternoon sun, in the north-west
 const MOON = new THREE.Vector3(-.30, .62, -.72).normalize();                // gibbous moon high in the north, away from the galactic core
@@ -859,7 +859,14 @@ function tick(dt) {
     if (f || r) { const sp = Math.max(25, camera.position.distanceTo(controls.target) * .8) * dt; v1.multiplyScalar(f * sp).addScaledVector(v2, r * sp); camera.position.add(v1); controls.target.add(v1); }
   }
   controls.update();
-  const g = groundAt(camera.position.x, camera.position.z) + 1.7; if (camera.position.y < g) camera.position.y = g;
+  const lift = groundAt(camera.position.x, camera.position.z) + 1.7 - camera.position.y;
+  if (lift > 0) {                     // camera would dip below the ground
+    if (camera.position.y < controls.target.y + .15 * camera.position.distanceTo(controls.target)) {   // level or looking up: keep the view, but pull the pivot in close so further tilting
+      controls.target.y += lift; camera.position.y += lift;                        // turns the head up to the zenith instead of sliding the camera along the ground
+      const d = v1.subVectors(controls.target, camera.position).length();
+      if (d > 30) controls.target.copy(camera.position).addScaledVector(v1, 30 / d);
+    } else camera.position.y += lift;
+  }
   skyDome.position.copy(camera.position); cloudDome.position.copy(camera.position); sky.position.copy(camera.position);
   camera.getWorldDirection(v1); needle.style.transform = `rotate(${(-Math.atan2(v1.x, -v1.z)).toFixed(3)}rad)`;
   renderer.render(scene, camera);
