@@ -272,7 +272,8 @@ function surfaceColors(kind, geo) {
   }
   return col;
 }
-const terrain = { colors: {}, tex: {}, surface: 'meadow' };
+const START_SURFACE = Object.keys(SURFACES).find(k => location.hash.includes(k)) || 'glacier';   // #meadow / #desert override
+const terrain = { colors: {}, tex: {}, surface: START_SURFACE };
 function setSurface(kind) {
   const P = SURFACES[kind], { geo, mat } = terrain; terrain.surface = kind;
   geo.attributes.color.array.set(terrain.colors[kind] ||= surfaceColors(kind, geo)); geo.attributes.color.needsUpdate = true;
@@ -292,8 +293,8 @@ function buildTerrain() {
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   geo.setIndex(new THREE.BufferAttribute(idx, 1)); geo.computeVertexNormals();
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, map: buildDetailTexture('meadow'), roughness: 1, metalness: 0 });
-  terrain.geo = geo; terrain.mat = mat; terrain.tex.meadow = mat.map;
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, map: buildDetailTexture(START_SURFACE), roughness: 1, metalness: 0 });
+  terrain.geo = geo; terrain.mat = mat; terrain.tex[START_SURFACE] = mat.map;
   const siteTex = buildSiteTexture();
   mat.onBeforeCompile = sh => {
     sh.uniforms.uSite = { value: siteTex };
@@ -785,8 +786,8 @@ function tick(dt) {
 requestAnimationFrame(() => setTimeout(() => {
   scene.add(buildTerrain()); buildObservatory(); sky.add(buildStars()); buildUI();
   camera.position.copy(HOME.pos); controls.target.copy(HOME.target);
-  resize(); addEventListener('resize', resize); orientSky(); setSurface(Object.keys(SURFACES).find(k => location.hash.includes(k)) || 'meadow');
-  if (location.hash.includes('night')) { night = nightTarget = 1; setNight(true); applyNight(1); }
+  resize(); addEventListener('resize', resize); orientSky(); setSurface(START_SURFACE);
+  if (!location.hash.includes('day')) { night = nightTarget = 1; setNight(true); applyNight(1); }   // night is the default; #day starts in daylight
   setRotate(!location.hash.includes('still'));   // orbiting is the default; #still starts at rest
   for (const k in wx) if (location.hash.includes(k)) { setWeather(k, true); wx[k] = 1; applyNight(night); }
   window.app = { setWeather, setSurface, scene, camera, controls, renderer, sites, setNight, setRotate, flyTo, stargaze, groundAt, tick, THREE };

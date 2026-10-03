@@ -34,7 +34,7 @@ Then open <http://127.0.0.1:8377/>.
 
 Click a label, or a name in the list on the left, to fly to that telescope.
 
-Add flags to the URL to start in a given state, for example `index.html#night`, `#glacier`, `#snow` or `#night-desert-fog-still`. The flags are `night`, `still` (start without the automatic orbit), `meadow`, `desert`, `glacier`, `clouds`, `rain`, `snow` and `fog`.
+Add flags to the URL to start in a given state, for example `index.html#day`, `#desert`, `#snow` or `#day-desert-fog-still`. The page opens at night on the glacier surface; the flags are `day`, `still` (start without the automatic orbit), `meadow`, `desert`, `glacier`, `clouds`, `rain`, `snow` and `fog`.
 
 ## What is real and what is not
 

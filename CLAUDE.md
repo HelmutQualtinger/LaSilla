@@ -19,7 +19,7 @@ node --check <extracted module>.mjs             # only syntax check available: c
 
 Opening `index.html` via `file://` is designed to work (data is a classic script precisely so no `fetch` is needed) but has not been verified.
 
-URL hash flags, combinable: `#night`, `#still` (auto-orbit is on by default; use `#still` for screenshots and automation), `#meadow` / `#desert` / `#glacier`, `#clouds` / `#rain` / `#snow` / `#fog`.
+URL hash flags, combinable: `#day` (the page opens at night by default), `#still` (auto-orbit is on by default; use `#still` for screenshots and automation), `#meadow` / `#desert` (glacier is the default surface), `#clouds` / `#rain` / `#snow` / `#fog`.
 
 ### Driving it from browser automation
 
