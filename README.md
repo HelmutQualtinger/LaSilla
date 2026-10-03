@@ -53,6 +53,7 @@ Add flags to the URL to start in a given state, for example `index.html#day`, `#
 | `tools/build_data.py` | Regenerates `data.js` from elevation tiles and OpenStreetMap (needs numpy and Pillow); its inputs are cached in `tools/cache/` |
 | `docs/` | README screenshot and `preview.jpg`, the 1200×630 image used for link previews |
 | `CLAUDE.md` | Architecture notes for working on the code |
+| `PROMPT.md` | A prompt for a coding agent to rebuild this app from scratch |
 
 ## Data credits
 
