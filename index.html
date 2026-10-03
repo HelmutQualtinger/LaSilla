@@ -27,16 +27,20 @@
     font:13px/1.45 "Avenir Next","Segoe UI",system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
   canvas#gl { position:fixed; inset:0; width:100%; height:100%; display:block; outline:none; }
   .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; backdrop-filter:blur(14px) saturate(1.2); -webkit-backdrop-filter:blur(14px) saturate(1.2); }
-  #title { position:fixed; left:18px; top:16px; padding:12px 16px 12px; width:250px; }
+  #title { position:fixed; left:18px; top:16px; padding:12px 16px 12px; width:300px; }
   #title h1 { margin:0; font:500 19px/1.1 "Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif; letter-spacing:.14em; text-transform:uppercase; }
   #title p { margin:5px 0 0; color:var(--dim); font-size:11.5px; letter-spacing:.04em; font-variant-numeric:tabular-nums; }
   #title a { color:var(--amber); text-decoration:none; } #title a:hover, #title a:focus-visible { text-decoration:underline; outline:none; }
-  #list { position:fixed; left:18px; top:114px; width:250px; max-height:min(46vh, calc(100vh - 172px)); overflow:auto; padding:6px; scrollbar-width:thin; scrollbar-color:var(--line) transparent; }
+  #list { position:fixed; left:18px; top:114px; width:300px; max-height:min(46vh, calc(100vh - 172px)); overflow:auto; padding:6px; scrollbar-width:thin; scrollbar-color:var(--line) transparent; }
   #list button { display:block; width:100%; text-align:left; background:none; border:0; color:inherit; font:inherit; padding:7px 10px; border-radius:7px; cursor:pointer; }
   #list button:hover, #list button:focus-visible { background:rgba(243,239,230,.09); outline:none; }
+  #list .row { display:flex; align-items:center; gap:2px; }
+  #list .row button { flex:1; min-width:0; }
+  #list a { flex:none; padding:8px 8px; border-radius:7px; color:var(--amber); font-size:11px; text-decoration:none; white-space:nowrap; }
+  #list a:hover, #list a:focus-visible { background:rgba(243,239,230,.09); text-decoration:underline; outline:none; }
   #list b { display:block; font-weight:600; letter-spacing:.01em; }
   #list span { display:block; color:var(--dim); font-size:11.5px; }
-  #tools { position:fixed; right:18px; top:16px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; max-width:calc(100vw - 300px); }
+  #tools { position:fixed; right:18px; top:16px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; max-width:calc(100vw - 350px); }
   .seg { display:flex; padding:3px; gap:2px; }
   .seg button, .btn { background:none; border:0; color:var(--dim); font:inherit; font-weight:600; letter-spacing:.03em; padding:7px 14px; border-radius:7px; cursor:pointer; }
   .btn { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 14px; backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
@@ -453,12 +457,12 @@ function bakeGlow(group, top) {
 }
 
 // ---------- the observatory ----------
-const SPEC = {
-  'ESO 3.6m Telescope': { label: 'ESO 3.6-metre', H: 27, info: '3.57 m · since 1977 · home of the planet hunters HARPS and NIRPS' },
-  'Coudé Auxiliary Telescope': { label: 'CAT', H: 21, info: '1.4 m Coudé Auxiliary Telescope · retired 1998', balcony: false },
-  'New Technology Telescope': { label: 'NTT', type: 'ntt', info: '3.58 m · 1989 · pioneered active optics' },
-  'Swiss Leonhard Euler Telescope': { label: 'Euler', H: 5.5, info: 'Swiss 1.2 m · 1998 · CORALIE spectrograph' },
-  'MPG-ESO Telescope': { label: 'MPG/ESO 2.2-metre', H: 11, info: '2.2 m · 1984 · Wide Field Imager, FEROS, GROND' },
+const SPEC = {   // keyed by OSM name; wiki = English Wikipedia article title, only where a dedicated article exists
+  'ESO 3.6m Telescope': { label: 'ESO 3.6-metre', wiki: 'ESO 3.6 m Telescope', H: 27, info: '3.57 m · since 1977 · home of the planet hunters HARPS and NIRPS' },
+  'Coudé Auxiliary Telescope': { label: 'CAT', wiki: 'Coudé Auxiliary Telescope', H: 21, info: '1.4 m Coudé Auxiliary Telescope · retired 1998', balcony: false },
+  'New Technology Telescope': { label: 'NTT', wiki: 'New Technology Telescope', type: 'ntt', info: '3.58 m · 1989 · pioneered active optics' },
+  'Swiss Leonhard Euler Telescope': { label: 'Euler', wiki: 'Swiss 1.2-metre Leonhard Euler Telescope', H: 5.5, info: 'Swiss 1.2 m · 1998 · CORALIE spectrograph' },
+  'MPG-ESO Telescope': { label: 'MPG/ESO 2.2-metre', wiki: 'MPG/ESO telescope', H: 11, info: '2.2 m · 1984 · Wide Field Imager, FEROS, GROND' },
   'Danish Telescope': { label: 'Danish 1.54-metre', H: 8, mat: 'silver', info: '1.54 m · since 1979' },
   'Schmidt 1m Telescope': { label: 'ESO Schmidt', H: 7, info: '1 m Schmidt camera · 1971' },
   'ESO 1m Telescope': { label: 'ESO 1-metre', H: 6.5, info: '1966 · the first telescope on the mountain' },
@@ -467,9 +471,9 @@ const SPEC = {
   'Bochum 0.61-metre Telescope': { label: 'Bochum 0.61 m', H: 3.5, minor: true },
   'ESO 0.5-metre Telescope': { label: 'ESO 0.5 m', H: 3.2, minor: true },
   'Danish 0.5-metre Telescope': { label: 'Danish 0.5 m', H: 3.2, minor: true },
-  'TRAPPIST': { label: 'TRAPPIST-South', H: 3.2, info: '0.6 m robotic · 2010 · found the TRAPPIST-1 planets' },
-  'Swedish-ESO Submillimeter Telescope': { label: 'SEST', type: 'dish', dia: 15, info: '15 m submillimetre dish · 1987–2003' },
-  'REM': { label: 'REM', box: true, info: '0.6 m robotic · chases gamma-ray burst afterglows' },
+  'TRAPPIST': { label: 'TRAPPIST-South', wiki: 'TRAPPIST', H: 3.2, info: '0.6 m robotic · 2010 · found the TRAPPIST-1 planets' },
+  'Swedish-ESO Submillimeter Telescope': { label: 'SEST', wiki: 'Swedish-ESO Submillimetre Telescope', type: 'dish', dia: 15, info: '15 m submillimetre dish · 1987–2003' },
+  'REM': { label: 'REM', wiki: 'Rapid Eye Mount telescope', box: true, info: '0.6 m robotic · chases gamma-ray burst afterglows' },
   'La Silla Hotel': { label: 'Hotel La Silla', box: true, h: 7, info: 'Residencia for astronomers and staff' },
 };
 const world = new THREE.Group(); scene.add(world);
@@ -511,7 +515,7 @@ function buildObservatory() {
     const [x, z] = n.p;
     if (n.name === 'BlackGEM') {
       const g = makeDome({ R: 2.4, H: 2.6, az: rnd() * 6.3, balcony: false }); place(g, x, n.base, z, g.userData.top);
-      if (i === 1) { lamp(x, n.base, z, 6); addSite({ label: 'BlackGEM', info: 'Three 0.65 m · hunts the light of gravitational-wave sources' }, x, n.base, z, g.userData.top, 12); }
+      if (i === 1) { lamp(x, n.base, z, 6); addSite({ label: 'BlackGEM', wiki: 'BlackGEM', info: 'Three 0.65 m · hunts the light of gravitational-wave sources' }, x, n.base, z, g.userData.top, 12); }
     } else { const g = makeDish(4.5, 1.0); place(g, x, n.base, z, g.userData.top); }
   });
 }
@@ -769,7 +773,10 @@ function buildUI() {
   }
   for (const name of order) {
     const s = sites.find(q => q.label === name); if (!s) continue;
-    const b = document.createElement('button'); b.innerHTML = `<b>${s.label}</b><span>${s.info}</span>`; b.onclick = () => visit(s); listBox.append(b);
+    const row = document.createElement('div'), b = document.createElement('button'); row.className = 'row';
+    b.innerHTML = `<b>${s.label}</b><span>${s.info}</span>`; b.onclick = () => visit(s); row.append(b);
+    if (s.wiki) row.insertAdjacentHTML('beforeend', `<a href="https://en.wikipedia.org/wiki/${encodeURI(s.wiki.replace(/ /g, '_'))}" target="_blank" rel="noopener" title="${s.wiki} on Wikipedia" aria-label="${s.label} on Wikipedia">Wikipedia ↗</a>`);
+    listBox.append(row);
   }
   const toggleLabels = () => document.getElementById('bLabels').setAttribute('aria-pressed', !document.body.classList.toggle('nolabels'));
   for (const b of document.querySelectorAll('[data-surface]')) b.onclick = () => setSurface(b.dataset.surface);
