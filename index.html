@@ -20,6 +20,7 @@
 <meta name="twitter:description" content="Fly around ESO's La Silla Observatory in Chile: real terrain and telescope layout, day and night, Milky Way sky, moonlight and weather.">
 <meta name="twitter:image" content="https://helmutqualtinger.github.io/LaSilla/docs/preview.jpg">
 <meta name="theme-color" content="#0b0a09">
+<link rel="license" href="https://creativecommons.org/publicdomain/zero/1.0/">
 <style>
   :root { --ink:#f3efe6; --dim:rgba(243,239,230,.62); --panel:rgba(18,16,14,.58); --line:rgba(243,239,230,.16); --amber:#ffb057; }
   * { box-sizing:border-box; }
@@ -87,6 +88,7 @@
   }
 </style>
 <script src="data.js"></script>
+<script src="sky.js"></script>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
@@ -117,7 +119,7 @@
   </div>
 </div>
 <div id="hint" class="panel"><kbd>Drag</kbd> orbit · <kbd>Right-drag</kbd> pan · <kbd>Scroll</kbd> zoom · <kbd>W A S D</kbd> fly · <kbd>R</kbd> rotate · <kbd>T</kbd> terrain · <kbd>1–4</kbd> weather · <kbd>N</kbd> day/night</div>
-<div id="credit">Terrain: SRTM via Mapzen terrain tiles · Layout © OpenStreetMap contributors</div>
+<div id="credit">Terrain: SRTM via Mapzen terrain tiles · Layout © OpenStreetMap contributors · Stars: HYG · Galaxies: OpenNGC</div>
 <div id="compass" class="panel" title="North"><i></i></div>
 <div id="loading">Raising the mountain…</div>
 <script>
@@ -602,27 +604,20 @@ const skyDome = new THREE.Mesh(new THREE.SphereGeometry(1000, 64, 32), new THREE
 }));
 skyDome.renderOrder = -10; skyDome.frustumCulled = false; scene.add(skyDome);
 
-const starU = { uClear: { value: 1 }, uNight: { value: 0 }, uTime: { value: 0 }, uPR: { value: PR } };
+const starU = { uScale: { value: 1500 }, uAspect: { value: 1 }, uClear: { value: 1 }, uNight: { value: 0 }, uTime: { value: 0 }, uPR: { value: PR } };
 function buildStars() {
-  const rnd = mulberry(1977), P = [], C = [], S = [], Ph = [];
-  const pal = [[.62, .74, 1], [.80, .87, 1], [1, 1, 1], [1, 1, 1], [1, .95, .82], [1, .84, .62], [1, .68, .48]];
-  const gauss = () => Math.sqrt(-2 * Math.log(1 - rnd())) * Math.cos(6.2832 * rnd());
-  const push = (v, size, inten, col) => { P.push(v.x * 900, v.y * 900, v.z * 900); S.push(size, inten); C.push(...col); Ph.push(rnd()); };
-  for (let i = 0; i < 9000; i++) {                                    // field stars
-    const z = 2 * rnd() - 1, a = 6.2832 * rnd(), r = Math.sqrt(1 - z * z), u = Math.pow(rnd(), 7);
-    push(new THREE.Vector3(r * Math.cos(a), r * Math.sin(a), z), 1.25 + u * 4.2, .45 + u * 1.5, pal[rnd() * pal.length | 0]);
+  // real sky: stars from the HYG catalogue, galaxies from OpenNGC (see tools/build_sky.py); positions are converted from RA/Dec to the galactic frame
+  const K = window.LASILLA_SKY, rnd = mulberry(1977), P = [], C = [], S = [], Ph = [];
+  const eqToGal = (ra, dec) => { const e = [Math.cos(dec) * Math.cos(ra), Math.cos(dec) * Math.sin(ra), Math.sin(dec)]; return GAL.map(g => g[0] * e[0] + g[1] * e[1] + g[2] * e[2]); };
+  const BV = [[-.4, [.58, .69, 1]], [0, [.78, .85, 1]], [.35, [1, 1, 1]], [.65, [1, .95, .84]], [1.0, [1, .84, .62]], [1.5, [1, .70, .46]], [2.1, [1, .56, .36]]];   // colour index B-V -> tint
+  const bvColor = c => { let i = 1; while (i < BV.length - 1 && c > BV[i][0]) i++; const [c0, a] = BV[i - 1], [c1, b] = BV[i], t = clamp((c - c0) / (c1 - c0), 0, 1); return a.map((v, k) => v + (b[k] - v) * t); };
+  const dv = new DataView(Uint8Array.from(atob(K.stars.b64), c => c.charCodeAt(0)).buffer);
+  for (let i = 0; i < K.stars.n; i++) {
+    const g = eqToGal(dv.getUint16(i * 6, true) / 65536 * 2 * Math.PI, dv.getInt16(i * 6 + 2, true) / 32767 * Math.PI / 2);
+    const mag = dv.getUint8(i * 6 + 4) / 25 - 2, m = Math.max(0, 6.5 - mag);
+    P.push(g[0] * 900, g[1] * 900, g[2] * 900); C.push(...bvColor(dv.getUint8(i * 6 + 5) / 100 - .5)); Ph.push(rnd());
+    S.push(Math.min(9.5, 1.15 + .55 * Math.pow(m, 1.25)), mag < 6.5 ? Math.min(2.4, .4 + .32 * m) : .4 * Math.pow(10, -.4 * (mag - 6.5)));
   }
-  for (let i = 0; i < 16000;) {                                       // crowding toward the galactic plane and centre
-    const l = 360 * rnd(), c = .5 + .5 * Math.cos(l * DEG); if (rnd() > .25 + .75 * Math.pow(c, 1.5)) continue; i++;
-    const u = Math.pow(rnd(), 9);
-    push(galVec(l, gauss() * lerp(6, 12, c)), 1.1 + u * 3, .3 + u * 1.2, pal[rnd() * pal.length | 0]);
-  }
-  // a few real southern showpieces, placed at their galactic coordinates: [l, b, magnitude, colour]
-  const W = [1, 1, 1], B = [.7, .8, 1], Y = [1, .93, .75], O = [1, .6, .4];
-  [[300.13, -0.36, .76, B], [302.46, 3.18, 1.25, B], [300.17, 5.65, 1.63, O], [298.23, 3.79, 2.8, B],        // Crux
-   [315.73, -0.68, -.27, Y], [311.77, 1.25, .6, B],                                                         // α, β Centauri
-   [351.95, 15.06, 1.0, O], [261.21, -25.29, -.74, W], [227.23, -8.89, -1.46, B], [290.84, -58.79, .46, B]]   // Antares, Canopus, Sirius, Achernar
-    .forEach(([l, b, m, col]) => push(galVec(l, b), clamp(9.5 - 2.2 * m, 4.5, 12.5), 2.4, col));
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); geo.setAttribute('aColor', new THREE.Float32BufferAttribute(C, 3));
   geo.setAttribute('aSI', new THREE.Float32BufferAttribute(S, 2)); geo.setAttribute('aPhase', new THREE.Float32BufferAttribute(Ph, 1));
@@ -639,7 +634,35 @@ function buildStars() {
       #include <colorspace_fragment>
     }`,
   }));
-  pts.frustumCulled = false; pts.renderOrder = -9; return pts;
+  pts.frustumCulled = false; pts.renderOrder = -9;
+  // galaxies: soft ellipses at their catalogue size, axis ratio and position angle (the two Magellanic Clouds are drawn by the Milky Way texture instead)
+  const GP = [], GA = [], GG = [];
+  for (const [raD, decD, maj, ratio, pa, mag] of K.galaxies) {
+    if (maj > 250) continue;
+    const ra = raD * DEG, dec = decD * DEG, g = eqToGal(ra, dec), p = pa * DEG;
+    const n = [-Math.sin(dec) * Math.cos(ra), -Math.sin(dec) * Math.sin(ra), Math.cos(dec)], e = [-Math.sin(ra), Math.cos(ra), 0];   // tangent north and east
+    const ax = n.map((v, k) => v * Math.cos(p) + e[k] * Math.sin(p));
+    GP.push(g[0] * 900, g[1] * 900, g[2] * 900); GA.push(...GAL.map(r => r[0] * ax[0] + r[1] * ax[1] + r[2] * ax[2]));
+    GG.push(maj / 60 * DEG, ratio, clamp(1.15 - .085 * mag, .12, .9));
+  }
+  const gg = new THREE.BufferGeometry();
+  gg.setAttribute('position', new THREE.Float32BufferAttribute(GP, 3)); gg.setAttribute('aAxis', new THREE.Float32BufferAttribute(GA, 3)); gg.setAttribute('aG', new THREE.Float32BufferAttribute(GG, 3));
+  const gal = new THREE.Points(gg, new THREE.ShaderMaterial({
+    uniforms: starU, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false,
+    vertexShader: `attribute vec3 aAxis, aG; uniform float uNight, uClear, uPR, uScale, uAspect; varying vec2 vAx; varying float vR, vB;
+      void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vec3 dir = normalize(wp.xyz - cameraPosition);
+        vec4 c0 = projectionMatrix * viewMatrix * wp, c1 = projectionMatrix * viewMatrix * (wp + vec4(mat3(modelMatrix) * aAxis * 9.0, 0.0));
+        vec2 s = c1.xy / c1.w - c0.xy / c0.w; s.x *= uAspect; vAx = s / max(length(s), 1e-6);            // major axis on screen
+        vR = aG.y; vB = aG.z * smoothstep(-0.01, 0.2, dir.y) * uClear * smoothstep(0.35, 1.0, uNight);
+        gl_Position = c0; gl_PointSize = clamp(aG.x * uScale * 2.2, 3.0 * uPR, 220.0); }`,
+    fragmentShader: `varying vec2 vAx; varying float vR, vB; void main(){ vec2 q = (gl_PointCoord - 0.5) * 2.0; q.y = -q.y;
+      float al = dot(q, vAx), ac = dot(q, vec2(-vAx.y, vAx.x)) / vR, a = max(exp(-(al * al + ac * ac) * 4.5) - 0.011, 0.0);
+      gl_FragColor = vec4(vec3(1.0, 0.90, 0.76) * (a * vB), 1.0);
+      #include <colorspace_fragment>
+    }`,
+  }));
+  gal.frustumCulled = false; gal.renderOrder = -9;
+  const both = new THREE.Group(); both.add(pts, gal); return both;
 }
 const sky = new THREE.Group(); scene.add(sky);
 let lst = 12.2 * 15 * DEG;           // local sidereal time: the galactic centre is climbing in the east-south-east
@@ -824,7 +847,7 @@ function tick(dt) {
   let dirty = night !== nightTarget; night = clamp(night + Math.sign(nightTarget - night) * dt / 2.4, 0, 1);
   for (const k in wx) if (wx[k] !== wxTarget[k]) { wx[k] = clamp(wx[k] + Math.sign(wxTarget[k] - wx[k]) * dt / 2, 0, 1); dirty = true; }
   if (dirty) applyNight(night);
-  fallU.uScale.value = renderer.domElement.height / (2 * Math.tan(camera.fov * DEG / 2));
+  starU.uScale.value = fallU.uScale.value = renderer.domElement.height / (2 * Math.tan(camera.fov * DEG / 2)); starU.uAspect.value = camera.aspect;
   lst += dt * .03 * DEG; orientSky(); starlight.position.copy(CORE).setY(Math.max(CORE.y, .35)).multiplyScalar(1000);
   if (fly) {
     fly.t = Math.min(1, fly.t + dt / fly.dur); const e = fly.t * fly.t * (3 - 2 * fly.t);

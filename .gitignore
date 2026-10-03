@@ -1,2 +1,5 @@
 .DS_Store
 __pycache__/
+tools/cache/hyg.csv
+tools/cache/NGC.csv
+tools/cache/addendum.csv

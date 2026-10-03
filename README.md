@@ -40,8 +40,8 @@ Add flags to the URL to start in a given state, for example `index.html#day`, `#
 
 ## What is real and what is not
 
-- **Real:** the terrain (SRTM elevation data), the positions and footprints of the buildings, and the roads (OpenStreetMap). The sky is oriented for La Silla's latitude, and a handful of bright southern stars, the Magellanic Clouds and the galactic centre sit where they belong.
-- **Stylised:** the telescope buildings are simplified shapes, not architectural replicas. The Milky Way and most stars are procedural.
+- **Real:** the terrain (SRTM elevation data), the positions and footprints of the buildings, and the roads (OpenStreetMap). The night sky: about 25,800 stars down to magnitude 7.5 from the HYG catalogue, with their real positions, brightness and colour, and about 1,050 galaxies down to magnitude 12 from OpenNGC, drawn at their catalogue size and orientation. The sky is oriented for La Silla's latitude.
+- **Stylised:** the telescope buildings are simplified shapes, not architectural replicas. The glow of the Milky Way, the two Magellanic Clouds and the Carina nebula are procedural, placed at their real positions. Galaxies are drawn brighter than the naked eye would see them.
 - **Artistic licence:** the amber lighting (a working observatory is kept dark), the meadow and glacier surfaces, and the weather. The real mountain is desert and has clear skies most nights of the year.
 
 ## Files
@@ -50,12 +50,29 @@ Add flags to the URL to start in a given state, for example `index.html#day`, `#
 |---|---|
 | `index.html` | The whole application: markup, styles and one script |
 | `data.js` | Generated elevation grid and map data; must stay next to `index.html` |
+| `sky.js` | Generated star and galaxy catalogue data; must stay next to `index.html` |
 | `tools/build_data.py` | Regenerates `data.js` from elevation tiles and OpenStreetMap (needs numpy and Pillow); its inputs are cached in `tools/cache/` |
 | `docs/` | README screenshot and `preview.jpg`, the 1200×630 image used for link previews |
+| `tools/build_sky.py` | Regenerates `sky.js` from the HYG and OpenNGC catalogues (downloads about 38 MB on first run) |
 | `CLAUDE.md` | Architecture notes for working on the code |
 | `PROMPT.md` | A prompt for a coding agent to rebuild this app from scratch |
+
+## Licence
+
+Everything original to this project is released under [CC0 1.0 Universal](LICENSE): the code in `index.html` and `tools/`, the documentation, the prompt and the images in `docs/`. You may copy, change and reuse it for any purpose, including commercially, without asking and without attribution.
+
+CC0 cannot cover material that belongs to others. These parts keep their own terms:
+
+| Part | Licence | What reuse requires |
+|---|---|---|
+| Map data in `data.js` and `tools/cache/osm.json` (buildings, roads) | ODbL 1.0, © OpenStreetMap contributors | Attribution; share-alike for derived databases |
+| Elevation data in `data.js` and `tools/cache/tile_*.png` | SRTM (public domain), via the Mapzen terrain tiles | Attribution requested by the tile provider |
+| `sky.js` (stars from HYG, galaxies from OpenNGC) | CC BY-SA 4.0 | Attribution; share-alike |
+| three.js, loaded from a CDN, not included here | MIT | Keep its licence notice if you bundle it |
 
 ## Data credits
 
 - Terrain: SRTM, via the Mapzen terrain tiles hosted on AWS.
 - Buildings and roads: © OpenStreetMap contributors, ODbL.
+- Stars: [HYG database](https://github.com/astronexus/HYG-Database) v4.1, CC BY-SA 4.0.
+- Galaxies: [OpenNGC](https://github.com/mattiaverga/OpenNGC), CC BY-SA 4.0. The derived `sky.js` is under the same licence.

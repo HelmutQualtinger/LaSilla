@@ -8,7 +8,9 @@ A navigable three.js model of ESO's La Silla Observatory (Chile). The app is two
 
 - `index.html` — all markup, CSS and one inline ES module (~700 lines). three.js r170 and `OrbitControls` come from jsDelivr via an import map, so the page needs internet.
 - `data.js` — generated; a classic script that sets `window.LASILLA`. Do not hand-edit, and do not Read it whole (890 KB, mostly base64).
+- `sky.js` — generated; sets `window.LASILLA_SKY` (catalogue stars and galaxies). Same rules as `data.js`.
 - `tools/build_data.py` — regenerates `data.js`; `tools/cache/` holds its downloaded inputs.
+- `tools/build_sky.py` — regenerates `sky.js` (standard library only). Its raw catalogues (HYG, OpenNGC; ~38 MB) are downloaded to `tools/cache/` on first run and are git-ignored.
 
 ## Running and checking
 
@@ -58,11 +60,15 @@ Repo: `HelmutQualtinger/LaSilla`; GitHub Pages serves `main` from the repo root 
 
 **Weather.** `wx` holds four independent 0–1 values (clouds, rain, snow, fog) that `tick` eases toward `wxTarget`; `applyNight` also reads them, so it is really the one environment update. Rain or snow imply full overcast: they darken the light, thicken the fog, grey the sky dome (`uGray`) and hide the stars (`uClear`). Clouds are a second camera-centred dome drawn between stars and scene — blended, but kept in the opaque queue via `CustomBlending` for the same sorting reason as the stars. Rain (line segments) and snow (points) live in a fixed box that the vertex shader wraps around the camera, so they cost the same wherever the camera is.
 
-**Sky.** A camera-centred dome shader draws the day gradient, the Milky Way with the Magellanic Clouds, and the moon. The Milky Way is procedural (`MW_GLSL`) but is rendered once by `bakeMilkyWay` into a galactic-coordinate (l, b) texture, sqrt-encoded in 8 bits, which the dome samples — computing it per pixel per frame was too slow for phones; stars are a separate `Points` cloud. Both are defined in **galactic coordinates** and oriented by `orientSky()`, which converts galactic → equatorial → local horizon for the site latitude and the sidereal time `lst` (slowly advancing). Named bright stars are listed as `[l, b, magnitude, colour]`. The star material is deliberately non-transparent with additive blending so it sorts into the opaque queue right after the dome (`renderOrder`), otherwise stars draw over buildings. Custom shaders end with `<tonemapping_fragment>` / `<colorspace_fragment>` so they match the ACES-tonemapped scene and the fog colour at the horizon.
+**Sky.** A camera-centred dome shader draws the day gradient, the Milky Way with the Magellanic Clouds, and the moon. The Milky Way is procedural (`MW_GLSL`) but is rendered once by `bakeMilkyWay` into a galactic-coordinate (l, b) texture, sqrt-encoded in 8 bits, which the dome samples — computing it per pixel per frame was too slow for phones; stars and galaxies are two separate `Points` clouds built by `buildStars()` from `sky.js`: stars are 6 bytes each (RA uint16, Dec int16, magnitude, B−V colour index; brightest first), galaxies are `[RA°, Dec°, major axis arcmin, axis ratio, position angle°, magnitude, name]` and are drawn as ellipses whose on-screen orientation is computed in the vertex shader. The Magellanic Clouds are skipped there (major axis > 250′) because the baked Milky Way texture draws them. Everything is converted to **galactic coordinates** at load and oriented by `orientSky()`, which converts galactic → equatorial → local horizon for the site latitude and the sidereal time `lst` (slowly advancing). The star material is deliberately non-transparent with additive blending so it sorts into the opaque queue right after the dome (`renderOrder`), otherwise stars draw over buildings. Custom shaders end with `<tonemapping_fragment>` / `<colorspace_fragment>` so they match the ACES-tonemapped scene and the fog colour at the horizon.
 
 **Phones.** `MOBILE` (coarse pointer or small screen) halves the site texture, shadow map and baked Milky Way sizes and caps the pixel ratio at 1.5. Below 720 px wide (or 460 px tall) the CSS hides the hint and credit and turns `#tools` and `#list` into dropdowns opened by two corner buttons, `#bList` top left (`body.list-open`) and `#bMenu` top right (`body.menu-open`); only one is open at a time, and tapping the scene or picking a building closes them; every feature must stay reachable from a button because there is no keyboard. Test the phone layout by loading the page in a 390 px wide `<iframe>` — resizing the automation window does not change the viewport. A classic `<script>` after `#loading` writes start-up errors (failed CDN load, no WebGL, exceptions) into the loading overlay.
 
 **Frame loop.** `frame()` only schedules; `tick(dt)` does the work (transition, sky rotation, fly-to animation, WASD movement, `controls.update()`, ground clamp, label projection with overlap culling).
+
+## Licensing
+
+Original work is CC0 1.0 (`LICENSE`, verbatim so GitHub detects it — keep scope notes in the README, not in that file). Third-party data keeps its own terms: OSM data in `data.js` is ODbL, `sky.js` is CC BY-SA 4.0. Before adding any new data source or bundled library, check its licence and add a row to the README's licence table and credits.
 
 ## Conventions
 
