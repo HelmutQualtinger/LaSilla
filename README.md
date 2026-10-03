@@ -30,11 +30,11 @@ Then open <http://127.0.0.1:8377/>.
 | `G` | Stargaze: stand on the ridge and look up at the galactic core |
 | `H` | Back to the overview |
 | `L` | Toggle labels |
-| `R` | Slow auto-rotate |
+| `R` | Toggle the automatic orbit (on at start) |
 
 Click a label, or a name in the list on the left, to fly to that telescope.
 
-Add flags to the URL to start in a given state, for example `index.html#night`, `#glacier`, `#snow` or `#night-desert-fog-rotate`. The flags are `night`, `rotate`, `meadow`, `desert`, `glacier`, `clouds`, `rain`, `snow` and `fog`.
+Add flags to the URL to start in a given state, for example `index.html#night`, `#glacier`, `#snow` or `#night-desert-fog-still`. The flags are `night`, `still` (start without the automatic orbit), `meadow`, `desert`, `glacier`, `clouds`, `rain`, `snow` and `fog`.
 
 ## What is real and what is not
 

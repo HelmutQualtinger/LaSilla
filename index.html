@@ -78,7 +78,7 @@
 <nav id="list" class="panel" aria-label="Telescopes"></nav>
 <div id="tools">
   <button class="btn" id="bLabels" aria-pressed="true" title="Toggle labels (L)">Labels</button>
-  <button class="btn" id="bRotate" aria-pressed="false" title="Slowly orbit the mountain (R)">Rotate</button>
+  <button class="btn" id="bRotate" aria-pressed="true" title="Slowly orbit the mountain (R)">Rotate</button>
   <button class="btn" id="bGaze" title="Stand on the ridge and look up (G)">Stargaze</button>
   <button class="btn" id="bHome" title="Overview (H)">Overview</button>
   <div class="seg panel" role="group" aria-label="Weather (keys 1 to 4)">
@@ -317,7 +317,7 @@ const FOG_DAY = new THREE.Color().setRGB(.66, .78, .93), FOG_NIGHT = new THREE.C
 scene.fog = new THREE.FogExp2(FOG_DAY.clone(), 3.4e-5);
 const camera = new THREE.PerspectiveCamera(52, 1, 2, 120000);
 const controls = new OrbitControls(camera, canvas);
-controls.autoRotateSpeed = .6;
+controls.autoRotateSpeed = 2;                // one orbit in about 30 s
 Object.assign(controls, { enableDamping: true, dampingFactor: .08, minDistance: 8, maxDistance: 22000, maxPolarAngle: Math.PI * .96, zoomToCursor: true, screenSpacePanning: false });
 
 const SUN = new THREE.Vector3(-.50, .58, -.64).normalize();                 // afternoon sun, in the north-west
@@ -787,7 +787,7 @@ requestAnimationFrame(() => setTimeout(() => {
   camera.position.copy(HOME.pos); controls.target.copy(HOME.target);
   resize(); addEventListener('resize', resize); orientSky(); setSurface(Object.keys(SURFACES).find(k => location.hash.includes(k)) || 'meadow');
   if (location.hash.includes('night')) { night = nightTarget = 1; setNight(true); applyNight(1); }
-  if (location.hash.includes('rotate')) setRotate(true);
+  setRotate(!location.hash.includes('still'));   // orbiting is the default; #still starts at rest
   for (const k in wx) if (location.hash.includes(k)) { setWeather(k, true); wx[k] = 1; applyNight(night); }
   window.app = { setWeather, setSurface, scene, camera, controls, renderer, sites, setNight, setRotate, flyTo, stargaze, groundAt, tick, THREE };
   frame(); document.getElementById('loading').classList.add('done');
