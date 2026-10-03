@@ -62,14 +62,14 @@
   #loading { position:fixed; inset:0; display:grid; place-items:center; padding:24px; text-align:center; line-height:1.6; background:#0b0a09; z-index:10; transition:opacity .8s; font:500 14px/1 "Iowan Old Style",Palatino,Georgia,serif; letter-spacing:.3em; text-transform:uppercase; color:var(--dim); }
   #loading.done { opacity:0; pointer-events:none; }
   #bMenu, #bList { display:none; position:fixed; right:10px; top:10px; width:44px; height:44px; padding:0; place-items:center; z-index:6; }
-  #bList { right:62px; }
+  #bList { right:auto; left:10px; }
   #bMenu[aria-expanded=true], #bList[aria-expanded=true] { border-color:var(--amber); color:var(--amber); }
   #bMenu i { display:block; width:18px; height:2px; border-radius:2px; background:currentColor; box-shadow:0 -6px 0 currentColor, 0 6px 0 currentColor; }
   @media (max-width:720px), (max-height:460px) {      /* phones: compact title, controls tucked behind the menu button */
     #hint, #credit { display:none; }
-    #list { display:none; left:auto; right:10px; top:62px; width:min(290px, calc(100vw - 20px)); max-height:calc(100vh - 76px); max-height:calc(100dvh - 76px); z-index:5; background:rgba(18,16,14,.82); }
+    #list { display:none; left:10px; top:62px; width:min(290px, calc(100vw - 20px)); max-height:calc(100vh - 76px); max-height:calc(100dvh - 76px); z-index:5; background:rgba(18,16,14,.82); }
     body.list-open #list { display:block; }
-    #title { width:auto; max-width:calc(100vw - 126px); left:10px; top:10px; padding:8px 12px; } #title h1 { font-size:15px; } #title p { font-size:10.5px; margin-top:2px; }
+    #title { width:auto; max-width:calc(100vw - 126px); left:62px; top:10px; padding:8px 12px; } #title h1 { font-size:15px; } #title p { font-size:10.5px; margin-top:2px; }
     #bMenu, #bList { display:grid; color:var(--ink); }
     #tools { display:none; right:10px; top:62px; width:min(290px, calc(100vw - 20px)); max-width:none; max-height:calc(100vh - 76px); max-height:calc(100dvh - 76px); overflow-y:auto;
       flex-direction:column; flex-wrap:nowrap; align-items:stretch; gap:8px; padding:10px; z-index:5;
