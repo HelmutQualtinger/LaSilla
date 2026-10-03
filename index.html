@@ -61,12 +61,16 @@
   body.nolabels #labels { display:none; }
   #loading { position:fixed; inset:0; display:grid; place-items:center; padding:24px; text-align:center; line-height:1.6; background:#0b0a09; z-index:10; transition:opacity .8s; font:500 14px/1 "Iowan Old Style",Palatino,Georgia,serif; letter-spacing:.3em; text-transform:uppercase; color:var(--dim); }
   #loading.done { opacity:0; pointer-events:none; }
-  #bMenu { display:none; position:fixed; right:10px; top:10px; width:44px; height:44px; padding:0; place-items:center; z-index:6; }
+  #bMenu, #bList { display:none; position:fixed; right:10px; top:10px; width:44px; height:44px; padding:0; place-items:center; z-index:6; }
+  #bList { right:62px; }
+  #bMenu[aria-expanded=true], #bList[aria-expanded=true] { border-color:var(--amber); color:var(--amber); }
   #bMenu i { display:block; width:18px; height:2px; border-radius:2px; background:currentColor; box-shadow:0 -6px 0 currentColor, 0 6px 0 currentColor; }
   @media (max-width:720px), (max-height:460px) {      /* phones: compact title, controls tucked behind the menu button */
-    #list, #hint, #credit { display:none; }
-    #title { width:auto; max-width:calc(100vw - 74px); left:10px; top:10px; padding:8px 12px; } #title h1 { font-size:15px; } #title p { font-size:10.5px; margin-top:2px; }
-    #bMenu { display:grid; color:var(--ink); }
+    #hint, #credit { display:none; }
+    #list { display:none; left:auto; right:10px; top:62px; width:min(290px, calc(100vw - 20px)); max-height:calc(100vh - 76px); max-height:calc(100dvh - 76px); z-index:5; background:rgba(18,16,14,.82); }
+    body.list-open #list { display:block; }
+    #title { width:auto; max-width:calc(100vw - 126px); left:10px; top:10px; padding:8px 12px; } #title h1 { font-size:15px; } #title p { font-size:10.5px; margin-top:2px; }
+    #bMenu, #bList { display:grid; color:var(--ink); }
     #tools { display:none; right:10px; top:62px; width:min(290px, calc(100vw - 20px)); max-width:none; max-height:calc(100vh - 76px); max-height:calc(100dvh - 76px); overflow-y:auto;
       flex-direction:column; flex-wrap:nowrap; align-items:stretch; gap:8px; padding:10px; z-index:5;
       background:rgba(18,16,14,.82); border:1px solid var(--line); border-radius:12px; backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
@@ -91,7 +95,8 @@
 <div id="labels"></div>
 <div id="title" class="panel"><h1>La Silla</h1><p>ESO · Atacama, Chile · 29°15′S 70°44′W · 2400 m</p><p><a href="https://github.com/HelmutQualtinger/LaSilla" target="_blank" rel="noopener">Source on GitHub ↗</a></p></div>
 <nav id="list" class="panel" aria-label="Telescopes"></nav>
-<button class="btn" id="bMenu" aria-label="Menu" aria-expanded="false" aria-controls="tools"><i></i></button>
+<button class="btn" id="bList" aria-label="Telescopes and buildings" aria-expanded="false" aria-controls="list"><svg width="20" height="16" viewBox="0 0 20 16" fill="currentColor" aria-hidden="true"><circle cx="2" cy="2" r="1.6"/><circle cx="2" cy="8" r="1.6"/><circle cx="2" cy="14" r="1.6"/><rect x="6" y="1" width="14" height="2" rx="1"/><rect x="6" y="7" width="14" height="2" rx="1"/><rect x="6" y="13" width="14" height="2" rx="1"/></svg></button>
+<button class="btn" id="bMenu" aria-label="Settings menu" aria-expanded="false" aria-controls="tools"><i></i></button>
 <div id="tools">
   <button class="btn" id="bLabels" aria-pressed="true" title="Toggle labels (L)">Labels</button>
   <button class="btn" id="bRotate" aria-pressed="true" title="Slowly orbit the mountain (R)">Rotate</button>
@@ -773,9 +778,12 @@ function buildUI() {
   document.getElementById('bLabels').onclick = toggleLabels; document.getElementById('bGaze').onclick = stargaze;
   document.getElementById('bRotate').onclick = () => setRotate(!controls.autoRotate);
   document.getElementById('bHome').onclick = () => flyTo(HOME.pos.clone(), HOME.target.clone());
-  const menu = document.getElementById('bMenu'), setMenu = open => menu.setAttribute('aria-expanded', document.body.classList.toggle('menu-open', open));   // phone layout only
-  menu.onclick = () => setMenu(!document.body.classList.contains('menu-open'));
-  canvas.addEventListener('pointerdown', () => setMenu(false)); addEventListener('keydown', e => { if (e.key === 'Escape') setMenu(false); });
+  // phone layout: two dropdowns (settings, building list); opening one closes the other
+  const drops = { 'menu-open': document.getElementById('bMenu'), 'list-open': document.getElementById('bList') };
+  const setDrop = (which, open) => { for (const k in drops) drops[k].setAttribute('aria-expanded', document.body.classList.toggle(k, open && k === which)); };
+  for (const k in drops) drops[k].onclick = () => setDrop(k, !document.body.classList.contains(k));
+  listBox.addEventListener('click', () => setDrop(null, false));            // picking a building closes the list
+  canvas.addEventListener('pointerdown', () => setDrop(null, false)); addEventListener('keydown', e => { if (e.key === 'Escape') setDrop(null, false); });
   addEventListener('keydown', e => {
     if (e.metaKey || e.ctrlKey || e.altKey) return; const k = e.key.toLowerCase(); keys.add(k);
     const w = Object.keys(wx)['1234'.indexOf(k)]; if (w && k) setWeather(w, !wxTarget[w]);
