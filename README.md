@@ -28,6 +28,7 @@ Then open <http://127.0.0.1:8377/>.
 | `N` | Day / night |
 | `T` | Cycle ground: meadow, desert, glacier |
 | `1` `2` `3` `4` | Toggle clouds, rain, snow, fog (they combine) |
+| `F` | Follow me: ride along behind one of the Teslas; press again to let go |
 | `G` | Stargaze: stand on the ridge and look up at the galactic core |
 | `H` | Back to the overview |
 | `L` | Toggle labels |
@@ -41,9 +42,9 @@ Add flags to the URL to start in a given state, for example `index.html#day`, `#
 
 ## What is real and what is not
 
-- **Real:** the terrain (SRTM elevation data), the positions and footprints of the buildings, and the roads (OpenStreetMap). The night sky: about 25,800 stars down to magnitude 7.5 from the HYG catalogue, with their real positions, brightness and colour, and about 1,050 galaxies down to magnitude 12 from OpenNGC, drawn at their catalogue size and orientation. The sky is oriented for La Silla's latitude.
+- **Real:** the terrain (SRTM elevation data), the positions and footprints of the buildings, and the roads (OpenStreetMap). The night sky: about 25,800 stars down to magnitude 7.5 from the HYG catalogue, with their real positions, brightness and colour, and about 1,050 galaxies down to magnitude 12 from OpenNGC, drawn at their catalogue size and orientation. The main constellations are traced with faint red lines between their catalogue stars. The sky is oriented for La Silla's latitude.
 - **Stylised:** the telescope buildings are simplified shapes, not architectural replicas. The glow of the Milky Way, the two Magellanic Clouds and the Carina nebula are procedural, placed at their real positions. Galaxies are drawn brighter than the naked eye would see them.
-- **Artistic licence:** the amber lighting (a working observatory is kept dark), the meadow and glacier surfaces, and the weather. The real mountain is desert and has clear skies most nights of the year.
+- **Artistic licence:** the amber lighting (a working observatory is kept dark), the meadow and glacier surfaces, the weather, the Teslas on the roads, and the constantly turning SEST dish and 3.6 m dome (SEST was retired in 2003). The real mountain is desert and has clear skies most nights of the year.
 
 ## Files
 
@@ -54,7 +55,7 @@ Add flags to the URL to start in a given state, for example `index.html#day`, `#
 | `sky.js` | Generated star and galaxy catalogue data; must stay next to `index.html` |
 | `tools/build_data.py` | Regenerates `data.js` from elevation tiles and OpenStreetMap (needs numpy and Pillow); its inputs are cached in `tools/cache/` |
 | `docs/` | README screenshot and `preview.jpg`, the 1200×630 image used for link previews |
-| `tools/build_sky.py` | Regenerates `sky.js` from the HYG and OpenNGC catalogues (downloads about 38 MB on first run) |
+| `tools/build_sky.py` | Regenerates `sky.js` (stars, galaxies, constellation figures) from the HYG and OpenNGC catalogues (downloads about 38 MB on first run) |
 | `CLAUDE.md` | Architecture notes for working on the code |
 | `PROMPT.md` | A prompt for a coding agent to rebuild this app from scratch |
 
