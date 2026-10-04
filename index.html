@@ -883,6 +883,15 @@ function setMusic(on) {              // Strauss, Also sprach Zarathustra, introd
   if (!music) { music = new Audio('zarathustra.mp3'); music.onended = music.onerror = () => show(false); }
   show(on); if (on) { music.currentTime = 0; music.play().catch(e => { if (e.name !== 'AbortError') { show(false); music = null; } }); }   // refused: forget it, so the next interaction tries again else music.pause();
 }
+function goTo(cx, cy) {                // click or tap on the ground: fly closer and make that spot the new pivot
+  const o = camera.position, d = new THREE.Vector3(cx / innerWidth * 2 - 1, 1 - cy / innerHeight * 2, .5).unproject(camera).sub(o).normalize(), p = new THREE.Vector3();
+  let lo = 0, t = 2, hit = false;      // march the view ray down onto the rendered surface, then bisect
+  for (let i = 0; i < 800 && t < 40000 && !hit; i++) { p.copy(o).addScaledVector(d, t); const h = p.y - groundAt(p.x, p.z); if (h < 0) hit = true; else { lo = t; t += Math.max(1.5, h * .4); } }
+  if (!hit) return;                    // sky
+  for (let i = 0; i < 10; i++) { const m = (lo + t) / 2; p.copy(o).addScaledVector(d, m); if (p.y < groundAt(p.x, p.z)) t = m; else lo = m; }
+  p.y = groundAt(p.x, p.z) + 2; const dist = clamp(o.distanceTo(p) * .35, 60, 500), back = new THREE.Vector3().subVectors(o, p).setY(0).normalize();
+  flyTo(p.clone().addScaledVector(back, dist).add(new THREE.Vector3(0, dist * .3, 0)), p, 1.4);
+}
 function setRotate(v) { controls.autoRotate = !!v; document.getElementById('bRotate').setAttribute('aria-pressed', !!v); }
 function stargaze() {
   setRotate(false);                    // orbiting makes no sense while standing on the ridge
@@ -917,6 +926,9 @@ function buildUI() {
   const firstTouch = e => { if (!music && !e.target.closest?.('#bMusic') && e.key?.toLowerCase() !== 'm') setMusic(true); };   // the music starts by itself with the first click, tap or key (#mute prevents it)
   if (!location.hash.includes('mute')) for (const ev of ['pointerup', 'keydown']) addEventListener(ev, firstTouch, true);
   document.getElementById('bHome').onclick = () => flyTo(HOME.pos.clone(), HOME.target.clone());
+  let tap = null;                      // a click or tap without dragging goes to that point on the ground (not while it merely closes a phone dropdown)
+  canvas.addEventListener('pointerdown', e => { tap = e.button === 0 && e.isPrimary && !document.body.matches('.menu-open, .list-open') ? { x: e.clientX, y: e.clientY, t: performance.now() } : null; });
+  canvas.addEventListener('pointerup', e => { if (tap && e.isPrimary && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 6 && performance.now() - tap.t < 400) goTo(e.clientX, e.clientY); tap = null; });
   // looking up, tick switches the orbit zoom off and the wheel or a pinch narrows the lens instead
   canvas.addEventListener('wheel', e => { if (!controls.enableZoom) { e.preventDefault(); zoomSky(Math.exp(e.deltaY * .0015)); } }, { passive: false });
   const touch = new Map(); let pinch = 0;
@@ -1007,7 +1019,7 @@ requestAnimationFrame(() => setTimeout(() => {
   if (!location.hash.includes('day')) { night = nightTarget = 1; setNight(true); applyNight(1); }   // night is the default; #day starts in daylight
   setRotate(!location.hash.includes('still'));   // orbiting is the default; #still starts at rest
   for (const k in wx) if (location.hash.includes(k)) { setWeather(k, true); wx[k] = 1; applyNight(night); }
-  window.app = { setWeather, setSurface, scene, camera, controls, renderer, sites, setNight, setRotate, flyTo, stargaze, groundAt, cars, setFollow, setMusic, tick, THREE };
+  window.app = { setWeather, setSurface, scene, camera, controls, renderer, sites, setNight, setRotate, flyTo, stargaze, groundAt, cars, setFollow, setMusic, goTo, tick, THREE };
   frame(); document.getElementById('loading').classList.add('done');
 }, 30));
 </script>
