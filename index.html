@@ -50,7 +50,7 @@
   .seg button[aria-pressed=true] { background:rgba(243,239,230,.92); color:#1a1714; }
   body.night .seg button[aria-pressed=true] { background:var(--amber); color:#1d1206; }
   .btn[aria-pressed=true] { color:var(--ink); border-color:rgba(243,239,230,.4); }
-  #bRotate[aria-pressed=true], #bFollow[aria-pressed=true] { color:var(--amber); border-color:var(--amber); }
+  #bRotate[aria-pressed=true], #bFollow[aria-pressed=true], #bMusic[aria-pressed=true] { color:var(--amber); border-color:var(--amber); }
   #hint { position:fixed; left:50%; bottom:14px; transform:translateX(-50%); padding:7px 14px; color:var(--dim); font-size:11.5px; white-space:nowrap; }
   #hint kbd { font:inherit; color:var(--ink); }
   #compass { position:fixed; right:22px; bottom:18px; width:46px; height:46px; border-radius:50%; display:grid; place-items:center; }
@@ -77,12 +77,12 @@
     #title { width:auto; max-width:calc(100vw - 126px); left:62px; top:10px; padding:8px 12px; } #title h1 { font-size:15px; } #title p { font-size:10.5px; margin-top:2px; }
     #bMenu, #bList { display:grid; color:var(--ink); }
     #tools { display:none; right:10px; top:62px; width:min(290px, calc(100vw - 20px)); max-width:none; max-height:calc(100vh - 76px); max-height:calc(100dvh - 76px); overflow-y:auto;
-      flex-direction:column; flex-wrap:nowrap; align-items:stretch; gap:8px; padding:10px; z-index:5;
+      grid-template-columns:repeat(3, 1fr); gap:5px; padding:6px; z-index:5;
       background:rgba(18,16,14,.82); border:1px solid var(--line); border-radius:12px; backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
-    body.menu-open #tools { display:flex; }
+    body.menu-open #tools { display:grid; }
     #tools [aria-label^="Time"] { order:-3; } #tools [aria-label^="Ground"] { order:-2; } #tools [aria-label^="Weather"] { order:-1; }
-    #tools .btn { text-align:left; background:rgba(243,239,230,.07); backdrop-filter:none; -webkit-backdrop-filter:none; }
-    #tools .seg { background:rgba(243,239,230,.07); backdrop-filter:none; -webkit-backdrop-filter:none; } #tools .seg button { flex:1; padding:9px 4px; }
+    #tools .btn { padding:9px 2px; border-radius:8px; white-space:nowrap; background:rgba(243,239,230,.07); backdrop-filter:none; -webkit-backdrop-filter:none; }   /* six buttons, three to a row */
+    #tools .seg { grid-column:1 / -1; padding:2px; border-radius:8px; background:rgba(243,239,230,.07); backdrop-filter:none; -webkit-backdrop-filter:none; } #tools .seg button { flex:1; padding:8px 2px; }
     #compass { right:12px; bottom:calc(12px + env(safe-area-inset-bottom)); width:40px; height:40px; }
     .lbl { font-size:10.5px; }
   }
@@ -107,6 +107,7 @@
   <button class="btn" id="bLabels" aria-pressed="true" title="Toggle labels (L)">Labels</button>
   <button class="btn" id="bRotate" aria-pressed="true" title="Slowly orbit the mountain (R)">Rotate</button>
   <button class="btn" id="bFollow" aria-pressed="false" title="Ride along behind one of the Teslas; press again to let go (F)">Follow me</button>
+  <button class="btn" id="bMusic" aria-pressed="false" title="Richard Strauss, Also sprach Zarathustra: the sunrise fanfare (M)">Music</button>
   <button class="btn" id="bGaze" title="Stand on the ridge and look up (G)">Stargaze</button>
   <button class="btn" id="bHome" title="Overview (H)">Overview</button>
   <div class="seg panel" role="group" aria-label="Weather (keys 1 to 4)">
@@ -119,8 +120,8 @@
     <button id="bDay" aria-pressed="true">Day</button><button id="bNight" aria-pressed="false">Night</button>
   </div>
 </div>
-<div id="hint" class="panel"><kbd>Drag</kbd> orbit · <kbd>Right-drag</kbd> pan · <kbd>Scroll</kbd> zoom · <kbd>W A S D</kbd> fly · <kbd>R</kbd> rotate · <kbd>F</kbd> follow a car · <kbd>T</kbd> terrain · <kbd>1–4</kbd> weather · <kbd>N</kbd> day/night</div>
-<div id="credit">Terrain: SRTM via Mapzen terrain tiles · Layout © OpenStreetMap contributors · Stars: HYG · Galaxies: OpenNGC</div>
+<div id="hint" class="panel"><kbd>Drag</kbd> orbit · <kbd>Right-drag</kbd> pan · <kbd>Scroll</kbd> zoom · <kbd>W A S D</kbd> fly · <kbd>R</kbd> rotate · <kbd>F</kbd> follow a car · <kbd>M</kbd> music · <kbd>T</kbd> terrain · <kbd>1–4</kbd> weather · <kbd>N</kbd> day/night</div>
+<div id="credit">Terrain: SRTM via Mapzen terrain tiles · Layout © OpenStreetMap contributors · Stars: HYG · Galaxies: OpenNGC · Music: R. Strauss / Kevin MacLeod, CC BY 3.0</div>
 <div id="compass" class="panel" title="North"><i></i></div>
 <div id="loading">Raising the mountain…</div>
 <script>
@@ -526,7 +527,7 @@ function buildObservatory() {
 // ---------- traffic: a few Teslas on the roads ----------
 const cars = [], PAINT = [0xf2f2f0, 0xa3121f, 0x1c3a6e, 0x45484d, 0x101012];   // pearl white, red, deep blue, midnight silver, black
 const carM = {
-  glass: new THREE.MeshStandardMaterial({ color: 0x0b0d10, roughness: .12, metalness: .6 }), tyre: new THREE.MeshStandardMaterial({ color: 0x141414, roughness: .9 }),
+  glass: new THREE.MeshStandardMaterial({ color: 0x0b0d10, roughness: .12, metalness: .6 }), tyre: new THREE.MeshStandardMaterial({ color: 0x141414, roughness: .9 }), rim: new THREE.MeshStandardMaterial({ color: 0xb9bdc4, roughness: .35, metalness: .7 }),
   head: new THREE.MeshBasicMaterial({ color: 0xfff6e0 }), tail: new THREE.MeshBasicMaterial({ color: 0xff2414 }),
 };
 const beamMat = (() => {             // pool of headlight on the road: an additive quad, far cheaper than a light on the terrain
@@ -537,14 +538,30 @@ const beamMat = (() => {             // pool of headlight on the road: an additi
   return new THREE.MeshBasicMaterial({ map: t, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false, opacity: 0 });
 })();
 function makeTesla(color) {          // stylised Model 3: nose towards +z, wheels standing on y = 0
-  const g = new THREE.Group(), V = (x, y) => new THREE.Vector2(x, y);
-  const ext = (sh, w) => { const geo = new THREE.ExtrudeGeometry(sh, { depth: w - .2, bevelThickness: .1, bevelSize: .1, bevelOffset: -.1, bevelSegments: 2, curveSegments: 5 }); geo.translate(0, 0, -(w - .2) / 2); geo.rotateY(-Math.PI / 2); return geo; };
-  const body = new THREE.Shape(); body.moveTo(-2.3, .25); body.lineTo(2.28, .25); body.splineThru([V(2.36, .5), V(2.2, .74), V(1.1, .92), V(-1.7, 1), V(-2.28, .96), V(-2.36, .55), V(-2.3, .25)]);
-  const cabin = new THREE.Shape(); cabin.moveTo(1.2, .88); cabin.splineThru([V(.3, 1.38), V(-.5, 1.43), V(-1.4, 1.22), V(-2.05, .95)]);
-  g.add(mesh(ext(body, 1.85), new THREE.MeshStandardMaterial({ color, roughness: .3, metalness: .5 })), mesh(ext(cabin, 1.5), carM.glass));
-  for (const x of [-.8, .8]) for (const z of [-1.42, 1.45]) { const w = mesh(new THREE.CylinderGeometry(.34, .34, .24, 16), carM.tyre, x, .34, z); w.rotation.z = Math.PI / 2; g.add(w); }
-  for (const x of [-.62, .62]) g.add(new THREE.Mesh(new THREE.BoxGeometry(.42, .07, .14), carM.head).translateX(x).translateY(.7).translateZ(2.2));
-  g.add(new THREE.Mesh(new THREE.BoxGeometry(1.4, .06, .14), carM.tail).translateY(.93).translateZ(-2.27));
+  const g = new THREE.Group(), L = 2.35, NS = 44, pos = [], rise = [], paint = [], dark = [];
+  const lin = (P, z) => { let i = 1; while (i < P.length - 1 && z > P[i][0]) i++; const a = P[i - 1], b = P[i]; return lerp(a[1], b[1], clamp((z - a[0]) / (b[0] - a[0]), 0, 1)); };
+  const BELT = [[-2.35, .6], [-2.28, .93], [-1.9, 1], [-1.2, 1], [1.1, .93], [1.9, .8], [2.22, .7], [2.35, .5]];   // tail, boot lid, waistline, bonnet, nose
+  const ROOF = [[-2, 0], [-1.4, .2], [-.5, .44], [.2, .41], [1.15, 0]];                                          // cabin height above the waistline
+  for (let s = 0; s <= NS; s++) {      // body lofted from 14-point cross-sections: rounded in plan, cabin leaning inwards
+    const z = L * Math.sin((s / NS - .5) * Math.PI), u = Math.abs(z) / L, hw = .92 * Math.pow(1 - u ** 5, .35), y0 = .2 + .3 * u ** 8, yb = Math.max(y0, lin(BELT, z)), r = lin(ROOF, z), mid = (y0 + yb) / 2;
+    const half = [[0, y0], [hw * .88, y0], [hw, Math.min(y0 + .14, mid)], [hw, Math.max(yb - .14, mid)], [hw * .94, yb], [hw * .78, yb + r * .92 + .02], [hw * .66, yb + r + .035], [0, yb + r + .05]];
+    for (let k = 0; k < 14; k++) { const q = half[k < 8 ? k : 14 - k]; pos.push(k < 8 ? q[0] : -q[0], q[1], z); }
+    rise.push(r);
+  }
+  for (let s = 0; s < NS; s++) for (let k = 0; k < 14; k++) {   // paint everywhere except the sills, the windows and the glass roof; the strip between them is pillar and roof rail
+    const a = s * 14 + k, b = s * 14 + (k + 1) % 14, kk = k < 7 ? k : 13 - k, glass = (rise[s] + rise[s + 1]) / 2 > .04 && (kk === 4 || kk === 6);
+    (kk < 2 || glass ? dark : paint).push(a, b, a + 14, b, b + 14, a + 14);
+  }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex([...paint, ...dark]);
+  geo.addGroup(0, paint.length, 0); geo.addGroup(paint.length, dark.length, 1); geo.computeVertexNormals();
+  g.add(mesh(geo, [new THREE.MeshPhysicalMaterial({ color, roughness: .35, metalness: .3, clearcoat: 1, clearcoatRoughness: .12 }), carM.glass]));
+  const cyl = (r, w, mat, x, z, arc = Math.PI * 2) => { const m = mesh(new THREE.CylinderGeometry(r, r, w, 20, 1, false, 0, arc), mat, x, .34, z); m.rotation.z = Math.PI / 2; return m; };
+  for (const sx of [-1, 1]) {
+    for (const z of [-1.42, 1.45]) g.add(cyl(.34, .25, carM.tyre, sx * .805, z), cyl(.22, .02, carM.rim, sx * .935, z), cyl(.42, .3, carM.tyre, sx * .775, z, Math.PI));   // tyre, rim, wheel arch
+    const lamp = (mat, w, x, y, z, a) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, .06, .1), mat); m.position.set(sx * x, y, z); m.rotation.y = sx * a; g.add(m); };
+    lamp(carM.head, .3, .5, .675, 2.19, .9); lamp(carM.tail, .34, .47, .88, -2.2, -.5);
+    g.add(mesh(new THREE.BoxGeometry(.14, .09, .13), carM.glass, sx * .96, 1.02, .82));   // door mirror
+  }
   const bg = new THREE.PlaneGeometry(8, 16); bg.rotateX(-Math.PI / 2); bg.translate(0, .25, 9.5); g.add(new THREE.Mesh(bg, beamMat));
   g.rotation.order = 'YXZ'; return g;
 }
@@ -701,7 +718,7 @@ function buildStars() {
     const n = [-Math.sin(dec) * Math.cos(ra), -Math.sin(dec) * Math.sin(ra), Math.cos(dec)], e = [-Math.sin(ra), Math.cos(ra), 0];   // tangent north and east
     const ax = n.map((v, k) => v * Math.cos(p) + e[k] * Math.sin(p));
     GP.push(g[0] * 900, g[1] * 900, g[2] * 900); GA.push(...GAL.map(r => r[0] * ax[0] + r[1] * ax[1] + r[2] * ax[2]));
-    GG.push(maj / 60 * DEG, ratio, clamp(1.15 - .085 * mag, .12, .9));
+    GG.push(maj / 60 * DEG, ratio, clamp(1.6 - .1 * mag, .4, 1.2));
   }
   const gg = new THREE.BufferGeometry();
   gg.setAttribute('position', new THREE.Float32BufferAttribute(GP, 3)); gg.setAttribute('aAxis', new THREE.Float32BufferAttribute(GA, 3)); gg.setAttribute('aG', new THREE.Float32BufferAttribute(GG, 3));
@@ -712,10 +729,10 @@ function buildStars() {
         vec4 c0 = projectionMatrix * viewMatrix * wp, c1 = projectionMatrix * viewMatrix * (wp + vec4(mat3(modelMatrix) * aAxis * 9.0, 0.0));
         vec2 s = c1.xy / c1.w - c0.xy / c0.w; s.x *= uAspect; vAx = s / max(length(s), 1e-6);            // major axis on screen
         vR = aG.y; vB = aG.z * smoothstep(-0.01, 0.2, dir.y) * uClear * smoothstep(0.35, 1.0, uNight);
-        gl_Position = c0; gl_PointSize = clamp(aG.x * uScale * 2.2, 3.0 * uPR, 220.0); }`,
+        gl_Position = c0; gl_PointSize = clamp(aG.x * uScale * 4.5, 11.0 * uPR, 300.0); }`,
     fragmentShader: `varying vec2 vAx; varying float vR, vB; void main(){ vec2 q = (gl_PointCoord - 0.5) * 2.0; q.y = -q.y;
-      float al = dot(q, vAx), ac = dot(q, vec2(-vAx.y, vAx.x)) / vR, a = max(exp(-(al * al + ac * ac) * 4.5) - 0.011, 0.0);
-      gl_FragColor = vec4(vec3(1.0, 0.90, 0.76) * (a * vB), 1.0);
+      float al = dot(q, vAx), ac = dot(q, vec2(-vAx.y, vAx.x)) / vR, a = max(exp(-(al * al + ac * ac) * 4.5) - 0.011, 0.0) * 2.6;
+      gl_FragColor = vec4(vec3(1.0, 0.40, 0.28) * (a * vB), 1.0);
       #include <colorspace_fragment>
     }`,
   }));
@@ -858,6 +875,12 @@ function setFollow(on) {             // chase camera: tick zooms in behind the c
   else { if (follow) controls.enabled = true; follow = null; }
   document.getElementById('bFollow').setAttribute('aria-pressed', !!follow);
 }
+let music = null;                    // created on first use: browsers only allow sound after a click or key press
+function setMusic(on) {              // Strauss, Also sprach Zarathustra, introduction; plays once (86 s) and then releases the button
+  const b = document.getElementById('bMusic'), show = v => b.setAttribute('aria-pressed', v);
+  if (!music) { music = new Audio('zarathustra.mp3'); music.onended = music.onerror = () => show(false); }
+  show(on); if (on) { music.currentTime = 0; music.play().catch(e => { if (e.name !== 'AbortError') { show(false); music = null; } }); }   // refused: forget it, so the next interaction tries again else music.pause();
+}
 function setRotate(v) { controls.autoRotate = !!v; document.getElementById('bRotate').setAttribute('aria-pressed', !!v); }
 function stargaze() {
   setRotate(false);                    // orbiting makes no sense while standing on the ridge
@@ -888,6 +911,9 @@ function buildUI() {
   document.getElementById('bLabels').onclick = toggleLabels; document.getElementById('bGaze').onclick = stargaze;
   document.getElementById('bRotate').onclick = () => setRotate(!controls.autoRotate);
   document.getElementById('bFollow').onclick = () => setFollow(!follow);
+  document.getElementById('bMusic').onclick = () => setMusic(!music || music.paused);
+  const firstTouch = e => { if (!music && !e.target.closest?.('#bMusic') && e.key?.toLowerCase() !== 'm') setMusic(true); };   // the music starts by itself with the first click, tap or key (#mute prevents it)
+  if (!location.hash.includes('mute')) for (const ev of ['pointerup', 'keydown']) addEventListener(ev, firstTouch, true);
   document.getElementById('bHome').onclick = () => flyTo(HOME.pos.clone(), HOME.target.clone());
   // phone layout: two dropdowns (settings, building list); opening one closes the other
   const drops = { 'menu-open': document.getElementById('bMenu'), 'list-open': document.getElementById('bList') };
@@ -898,7 +924,7 @@ function buildUI() {
   addEventListener('keydown', e => {
     if (e.metaKey || e.ctrlKey || e.altKey) return; const k = e.key.toLowerCase(); keys.add(k);
     const w = Object.keys(wx)['1234'.indexOf(k)]; if (w && k) setWeather(w, !wxTarget[w]);
-    if (k === 'n') setNight(!nightTarget); else if (k === 't') { const o = Object.keys(SURFACES); setSurface(o[(o.indexOf(terrain.surface) + 1) % o.length]); } else if (k === 'l') toggleLabels(); else if (k === 'r') setRotate(!controls.autoRotate); else if (k === 'g') stargaze(); else if (k === 'f') setFollow(!follow); else if (k === 'h') flyTo(HOME.pos.clone(), HOME.target.clone());
+    if (k === 'n') setNight(!nightTarget); else if (k === 't') { const o = Object.keys(SURFACES); setSurface(o[(o.indexOf(terrain.surface) + 1) % o.length]); } else if (k === 'l') toggleLabels(); else if (k === 'r') setRotate(!controls.autoRotate); else if (k === 'g') stargaze(); else if (k === 'f') setFollow(!follow); else if (k === 'm') setMusic(!music || music.paused); else if (k === 'h') flyTo(HOME.pos.clone(), HOME.target.clone());
   });
   addEventListener('keyup', e => keys.delete(e.key.toLowerCase())); addEventListener('blur', () => keys.clear());
 }
@@ -970,7 +996,7 @@ requestAnimationFrame(() => setTimeout(() => {
   if (!location.hash.includes('day')) { night = nightTarget = 1; setNight(true); applyNight(1); }   // night is the default; #day starts in daylight
   setRotate(!location.hash.includes('still'));   // orbiting is the default; #still starts at rest
   for (const k in wx) if (location.hash.includes(k)) { setWeather(k, true); wx[k] = 1; applyNight(night); }
-  window.app = { setWeather, setSurface, scene, camera, controls, renderer, sites, setNight, setRotate, flyTo, stargaze, groundAt, cars, setFollow, tick, THREE };
+  window.app = { setWeather, setSurface, scene, camera, controls, renderer, sites, setNight, setRotate, flyTo, stargaze, groundAt, cars, setFollow, setMusic, tick, THREE };
   frame(); document.getElementById('loading').classList.add('done');
 }, 30));
 </script>
