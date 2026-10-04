@@ -23,6 +23,7 @@ Then open <http://127.0.0.1:8377/>.
 | Input | Action |
 |---|---|
 | Drag / right-drag / scroll | Orbit / pan / zoom |
+| Scroll or pinch while looking up | Zoom into the sky like a telescope (the view widens again when you look back down) |
 | Drag upward, past the horizon | Tilt the view up, as far as the zenith; the camera settles on the ground and looks around from there |
 | `W` `A` `S` `D` or arrow keys | Fly |
 | `N` | Day / night |

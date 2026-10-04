@@ -869,6 +869,8 @@ function visit(s) {
   const dir = new THREE.Vector3().subVectors(camera.position, controls.target).setY(0).normalize();
   flyTo(tgt.clone().addScaledVector(dir, dist).add(new THREE.Vector3(0, dist * .12, 0)), tgt);
 }
+let skyZoom = 1, baseFov = 52;        // optical zoom: moving the camera cannot enlarge the sky, only a narrower field of view can
+function zoomSky(f) { skyZoom = clamp(skyZoom * f, .04, 1); camera.fov = baseFov * skyZoom; camera.updateProjectionMatrix(); controls.rotateSpeed = skyZoom; }   // dragging slows down with the magnification
 let follow = null, followIx = -1;
 function setFollow(on) {             // chase camera: tick zooms in behind the car, then keeps the pivot on it; each press picks the next car
   if (on) { const c = cars[followIx = (followIx + 1) % cars.length]; setRotate(false); fly = null; controls.enabled = false; follow = { c, t: 0, yaw: c.yaw, t0: controls.target.clone(), off: new THREE.Vector3().subVectors(camera.position, controls.target) }; }
@@ -915,6 +917,13 @@ function buildUI() {
   const firstTouch = e => { if (!music && !e.target.closest?.('#bMusic') && e.key?.toLowerCase() !== 'm') setMusic(true); };   // the music starts by itself with the first click, tap or key (#mute prevents it)
   if (!location.hash.includes('mute')) for (const ev of ['pointerup', 'keydown']) addEventListener(ev, firstTouch, true);
   document.getElementById('bHome').onclick = () => flyTo(HOME.pos.clone(), HOME.target.clone());
+  // looking up, tick switches the orbit zoom off and the wheel or a pinch narrows the lens instead
+  canvas.addEventListener('wheel', e => { if (!controls.enableZoom) { e.preventDefault(); zoomSky(Math.exp(e.deltaY * .0015)); } }, { passive: false });
+  const touch = new Map(); let pinch = 0;
+  const span = () => { const [a, b] = [...touch.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+  canvas.addEventListener('pointerdown', e => { if (e.pointerType === 'touch') { touch.set(e.pointerId, { x: e.clientX, y: e.clientY }); pinch = 0; } });
+  canvas.addEventListener('pointermove', e => { if (!touch.has(e.pointerId)) return; touch.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (touch.size === 2) { const d = span(); if (pinch && !controls.enableZoom) zoomSky(pinch / d); pinch = d; } });
+  for (const ev of ['pointerup', 'pointercancel']) canvas.addEventListener(ev, e => { touch.delete(e.pointerId); pinch = 0; });
   // phone layout: two dropdowns (settings, building list); opening one closes the other
   const drops = { 'menu-open': document.getElementById('bMenu'), 'list-open': document.getElementById('bList') };
   const setDrop = (which, open) => { for (const k in drops) drops[k].setAttribute('aria-expanded', document.body.classList.toggle(k, open && k === which)); };
@@ -944,7 +953,7 @@ function updateLabels(w, h) {
     s.el.style.visibility = show ? '' : 'hidden';
   }
 }
-function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.fov = w < h ? 68 : 52; /* wider lens in portrait */ camera.updateProjectionMatrix(); }
+function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; baseFov = w < h ? 68 : 52; /* wider lens in portrait */ zoomSky(1); }
 
 // ---------- go ----------
 const clock = new THREE.Clock(), needle = document.querySelector('#compass i');
@@ -975,6 +984,8 @@ function tick(dt) {
     const f = (keys.has('w') || keys.has('arrowup') ? 1 : 0) - (keys.has('s') || keys.has('arrowdown') ? 1 : 0), r = (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0);
     if (f || r) { const sp = Math.max(25, camera.position.distanceTo(controls.target) * .8) * dt; v1.multiplyScalar(f * sp).addScaledVector(v2, r * sp); camera.position.add(v1); controls.target.add(v1); }
   }
+  const up = camera.getWorldDirection(v1).y > .12; controls.enableZoom = !up;   // gazing above the horizon: zoom is optical
+  if (!up && skyZoom < 1) zoomSky(Math.exp(dt * 3));                              // back on the ground the lens opens up again
   controls.update();
   const lift = groundAt(camera.position.x, camera.position.z) + 1.7 - camera.position.y;
   if (lift > 0) {                     // camera would dip below the ground
