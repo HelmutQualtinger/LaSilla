@@ -978,7 +978,7 @@ function tick(dt) {
   starU.uScale.value = fallU.uScale.value = renderer.domElement.height / (2 * Math.tan(camera.fov * DEG / 2)); starU.uAspect.value = camera.aspect;
   for (const o of spinners) o.rotation.y += dt * Math.PI / 5;   // one turn per 10 s
   moveCars(dt);
-  lst += dt * .03 * DEG; orientSky(); starlight.position.copy(CORE).setY(Math.max(CORE.y, .35)).multiplyScalar(1000);
+  lst += dt * 1.25 * DEG; orientSky(); starlight.position.copy(CORE).setY(Math.max(CORE.y, .35)).multiplyScalar(1000);
   if (fly) {
     fly.t = Math.min(1, fly.t + dt / fly.dur); const e = fly.t * fly.t * (3 - 2 * fly.t);
     camera.position.lerpVectors(fly.p0, fly.p1, e); controls.target.lerpVectors(fly.t0, fly.t1, e);
@@ -989,8 +989,12 @@ function tick(dt) {
       follow.t = Math.min(1, follow.t + dt / 2); const e = follow.t * follow.t * (3 - 2 * follow.t);
       v2.set(-Math.sin(c.yaw) * 13, 4.5, -Math.cos(c.yaw) * 13); controls.target.lerpVectors(follow.t0, v1, e); camera.position.copy(follow.off).lerp(v2, e).add(controls.target);
       if (follow.t === 1) controls.enabled = true;
-    } else { camera.position.sub(controls.target).applyAxisAngle(camera.up, c.yaw - follow.yaw).add(v1); controls.target.copy(v1); }   // ride along and turn with the car; orbit and zoom stay free
-    follow.yaw = c.yaw;
+      follow.yaw = c.yaw;
+    } else {                           // ride along and turn with the car; orbit and zoom stay free. The pivot and the heading trail the car with a soft lag, so bumps and junction turns do not jolt the view
+      let dy = c.yaw - follow.yaw; dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI; dy *= 1 - Math.exp(-dt * 1.6); follow.yaw += dy;
+      const kh = 1 - Math.exp(-dt * 5), kv = 1 - Math.exp(-dt * 1.8); v2.copy(controls.target); v2.x += (v1.x - v2.x) * kh; v2.z += (v1.z - v2.z) * kh; v2.y += (v1.y - v2.y) * kv;
+      camera.position.sub(controls.target).applyAxisAngle(camera.up, dy).add(v2); controls.target.copy(v2);
+    }
   } else if (keys.size) {
     camera.getWorldDirection(v1).setY(0).normalize(); v2.set(-v1.z, 0, v1.x);
     const f = (keys.has('w') || keys.has('arrowup') ? 1 : 0) - (keys.has('s') || keys.has('arrowdown') ? 1 : 0), r = (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0);
