@@ -1,0 +1,21 @@
+{
+  "name": "La Silla Observatory · 3D",
+  "short_name": "La Silla 3D",
+  "description": "Fly around ESO's La Silla Observatory in Chile: real terrain and telescope layout, day and night, Milky Way sky, moonlight and weather.",
+  "lang": "en",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b0a09",
+  "theme_color": "#0b0a09",
+  "categories": ["education", "entertainment"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "screenshots": [
+    { "src": "docs/app-wide.jpg", "sizes": "1365x768", "type": "image/jpeg", "form_factor": "wide", "label": "La Silla ridge at dusk under the Milky Way" }
+  ]
+}

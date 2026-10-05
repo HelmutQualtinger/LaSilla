@@ -58,7 +58,8 @@ Add flags to the URL to start in a given state, for example `index.html#day`, `#
 | `sky.js` | Generated star and galaxy catalogue data; must stay next to `index.html` |
 | `zarathustra.mp3` | The music track; must stay next to `index.html` |
 | `tools/build_data.py` | Regenerates `data.js` from elevation tiles and OpenStreetMap (needs numpy and Pillow); its inputs are cached in `tools/cache/` |
-| `docs/` | README screenshot and `preview.jpg`, the 1200×630 image used for link previews |
+| `docs/` | README screenshot, `preview.jpg` (the 1200×630 image used for link previews) and `app-wide.jpg` (the install-dialog screenshot) |
+| `manifest.webmanifest`, `icons/` | Web app manifest and home-screen icons, so the page can be installed on Android ("Install app") and iOS ("Add to Home Screen") |
 | `tools/build_sky.py` | Regenerates `sky.js` (stars, galaxies, constellation figures) from the HYG and OpenNGC catalogues (downloads about 38 MB on first run) |
 | `CLAUDE.md` | Architecture notes for working on the code |
 | `PROMPT.md` | A prompt for a coding agent to rebuild this app from scratch |
