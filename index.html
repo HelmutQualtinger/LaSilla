@@ -58,7 +58,8 @@
   .seg button[aria-pressed=true] { background:rgba(243,239,230,.92); color:#1a1714; }
   body.night .seg button[aria-pressed=true] { background:var(--amber); color:#1d1206; }
   .btn[aria-pressed=true] { color:var(--ink); border-color:rgba(243,239,230,.4); }
-  #bRotate[aria-pressed=true], #bFollow[aria-pressed=true], #bMusic[aria-pressed=true] { color:var(--amber); border-color:var(--amber); }
+  #bRotate[aria-pressed=true], #bFollow[aria-pressed=true], #bMusic[aria-pressed=true], #bInstall { color:var(--amber); border-color:var(--amber); }
+  #bInstall[hidden] { display:none; }
   #hint { position:fixed; left:50%; bottom:14px; transform:translateX(-50%); padding:7px 14px; color:var(--dim); font-size:11.5px; white-space:nowrap; }
   #hint kbd { font:inherit; color:var(--ink); }
   #compass { position:fixed; right:22px; bottom:18px; width:46px; height:46px; border-radius:50%; display:grid; place-items:center; }
@@ -90,6 +91,7 @@
     body.menu-open #tools { display:grid; }
     #tools [aria-label^="Time"] { order:-3; } #tools [aria-label^="Ground"] { order:-2; } #tools [aria-label^="Weather"] { order:-1; }
     #tools .btn { padding:9px 2px; border-radius:8px; white-space:nowrap; background:rgba(243,239,230,.07); backdrop-filter:none; -webkit-backdrop-filter:none; }   /* six buttons, three to a row */
+    #tools #bInstall { grid-column:1 / -1; order:-4; }
     #tools .seg { grid-column:1 / -1; padding:2px; border-radius:8px; background:rgba(243,239,230,.07); backdrop-filter:none; -webkit-backdrop-filter:none; } #tools .seg button { flex:1; padding:8px 2px; }
     #compass { right:12px; bottom:calc(12px + env(safe-area-inset-bottom)); width:40px; height:40px; }
     .lbl { font-size:10.5px; }
@@ -120,6 +122,7 @@
   <button class="btn" id="bMusic" aria-pressed="false" title="Richard Strauss, Also sprach Zarathustra: the sunrise fanfare (M)">Music</button>
   <button class="btn" id="bGaze" title="Stand on the ridge and look up (G)">Stargaze</button>
   <button class="btn" id="bHome" title="Overview (H)">Overview</button>
+  <button class="btn" id="bInstall" hidden title="Install as an app on this device">Install app</button>
   <div class="seg panel" role="group" aria-label="Weather (keys 1 to 4)">
     <button data-wx="clouds" aria-pressed="false">Clouds</button><button data-wx="rain" aria-pressed="false">Rain</button><button data-wx="snow" aria-pressed="false">Snow</button><button data-wx="fog" aria-pressed="false">Fog</button>
   </div>
@@ -139,6 +142,12 @@
   function startFailed(msg) { var l = document.getElementById('loading'); if (l && !l.classList.contains('done')) l.textContent = 'Could not start · ' + msg; }
   addEventListener('error', function (e) { startFailed(e.message || ((e.target && (e.target.src || e.target.href)) ? 'failed to load ' + (e.target.src || e.target.href) : 'unknown error')); }, true);
   addEventListener('unhandledrejection', function (e) { startFailed(String(e.reason && e.reason.message || e.reason)); });
+  // installable app: a service worker (offline start after one visit) and an Install button wherever the browser offers installation (Chrome/Edge, Android)
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(function () {});
+  var installPrompt = null;
+  addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); installPrompt = e; document.getElementById('bInstall').hidden = false; });
+  addEventListener('appinstalled', function () { installPrompt = null; document.getElementById('bInstall').hidden = true; });
+  document.getElementById('bInstall').onclick = function () { if (!installPrompt) return; installPrompt.prompt(); installPrompt = null; this.hidden = true; };   // a prompt works once; Chrome fires beforeinstallprompt again if it was dismissed
 </script>
 
 <script type="module">

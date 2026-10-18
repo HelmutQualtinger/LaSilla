@@ -3,6 +3,7 @@
   "short_name": "La Silla 3D",
   "description": "Fly around ESO's La Silla Observatory in Chile: real terrain and telescope layout, day and night, Milky Way sky, moonlight and weather.",
   "lang": "en",
+  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
