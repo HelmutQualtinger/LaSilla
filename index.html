@@ -125,14 +125,14 @@
     <button data-wx="clouds" aria-pressed="false">Clouds</button><button data-wx="rain" aria-pressed="false">Rain</button><button data-wx="snow" aria-pressed="false">Snow</button><button data-wx="fog" aria-pressed="false">Fog</button>
   </div>
   <div class="seg panel" role="group" aria-label="Ground surface (T)">
-    <button data-surface="meadow" aria-pressed="true">Meadow</button><button data-surface="desert" aria-pressed="false">Desert</button><button data-surface="glacier" aria-pressed="false">Glacier</button>
+    <button data-surface="meadow" aria-pressed="true">Meadow</button><button data-surface="desert" aria-pressed="false">Desert</button><button data-surface="glacier" aria-pressed="false">Glacier</button><button data-surface="satellite" aria-pressed="false" title="Esri World Imagery, loaded on demand">Satellite</button>
   </div>
   <div class="seg panel" role="group" aria-label="Time of day">
     <button id="bDay" aria-pressed="true">Day</button><button id="bNight" aria-pressed="false">Night</button>
   </div>
 </div>
 <div id="hint" class="panel"><kbd>Drag</kbd> orbit · <kbd>Right-drag</kbd> pan · <kbd>Scroll</kbd> zoom · <kbd>W A S D</kbd> fly · <kbd>R</kbd> rotate · <kbd>F</kbd> follow a car · <kbd>M</kbd> music · <kbd>T</kbd> terrain · <kbd>1–4</kbd> weather · <kbd>N</kbd> day/night</div>
-<div id="credit">Terrain: SRTM via Mapzen terrain tiles · Layout © OpenStreetMap contributors · Stars: HYG · Galaxies: OpenNGC · Music: R. Strauss / Kevin MacLeod, CC BY 3.0</div>
+<div id="credit">Terrain: SRTM via Mapzen terrain tiles · Layout © OpenStreetMap contributors · Stars: HYG · Galaxies: OpenNGC · Music: R. Strauss / Kevin MacLeod, CC BY 3.0<span id="satCredit" hidden> · Imagery: Esri, Maxar, Earthstar Geographics, GIS User Community</span></div>
 <div id="compass" class="panel" title="North"><i></i></div>
 <div id="loading">Raising the mountain…</div>
 <script>
@@ -271,12 +271,38 @@ function buildSiteTexture() {
   pass(['unclassified', 'service'], '#5f5d5b');
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
 }
+// ---------- satellite imagery: Esri World Imagery tiles, coarse to fine, fetched only when the Satellite surface is chosen ----------
+const uSatOn = { value: 0 }, SAT_URL = (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+const SAT = [   // far / mid / near layer: zoom, centre, half-width in metres (zoom 18 ≈ 0.5 m per pixel here)
+  { z: MOBILE ? 11 : 12, cx: 0, cz: 0, ext: 26000 }, { z: MOBILE ? 14 : 15, cx: 0, cz: 0, ext: 6000 }, { z: MOBILE ? 17 : 18, cx: SITE.cx, cz: SITE.cz, ext: SITE.ext },
+].map(L => ({ ...L, tex: { value: new THREE.DataTexture(new Uint8Array(4), 1, 1) }, box: { value: new THREE.Vector4(0, 0, 0, 0) } }));
+let satLoading = false;
+function loadSatellite() {
+  if (satLoading) return; satLoading = true;
+  const C = Math.cos(D.lat0 * DEG);
+  for (const L of SAT) {
+    const n = 256 * 2 ** L.z, mpp = 156543.03392 * C / 2 ** L.z;                    // same Web-Mercator scaling as tools/build_data.py
+    const gx = (D.lon0 + 180) / 360 * n, gy = (1 - Math.asinh(Math.tan(D.lat0 * DEG)) / Math.PI) / 2 * n;
+    const W = Math.min(4096, Math.round(2 * L.ext / mpp)), x0 = gx + (L.cx - L.ext) / mpp, y0 = gy + (L.cz - L.ext) / mpp;
+    const cv = document.createElement('canvas'); cv.width = cv.height = W; const g = cv.getContext('2d');
+    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.flipY = false; t.anisotropy = 8;
+    L.box.value.set(L.cx - L.ext, L.cz - L.ext, 1 / (W * mpp), 1 / (W * mpp)); L.tex.value = t;
+    let timer = 0; const dirty = () => { timer ||= setTimeout(() => { timer = 0; t.needsUpdate = true; }, 400); };   // re-upload in batches, not per tile
+    for (let ty = Math.floor(y0 / 256); ty * 256 < y0 + W; ty++) for (let tx = Math.floor(x0 / 256); tx * 256 < x0 + W; tx++) {
+      const im = new Image(); im.crossOrigin = 'anonymous';
+      im.onload = () => { g.drawImage(im, tx * 256 - x0, ty * 256 - y0); dirty(); };
+      im.src = SAT_URL(L.z, tx, ty);
+    }
+  }
+}
 // ---------- switchable ground: meadow / desert / glacier ----------
 const SURFACES = {   // a/b: large-scale colour pair, pale: small patches, rock: steep slopes (s0..s1 = slope range)
   meadow:  { a: [.50, .68, .30], b: [.30, .52, .22], pale: [.72, .78, .40], rock: [.36, .42, .30], rockAmt: .6,  s0: .10, s1: .38, scale: 46, rough: 1,   gnd: 0x6f7f4a },
   desert:  { a: [.63, .50, .40], b: [.47, .34, .28], pale: [.70, .62, .53], rock: [.36, .29, .26], rockAmt: .8,  s0: .08, s1: .34, scale: 26, rough: 1,   gnd: 0x8a6d55 },
   glacier: { a: [.90, .94, .98], b: [.70, .83, .95], pale: [.56, .77, .95], rock: [.27, .29, .33], rockAmt: .92, s0: .13, s1: .30, scale: 70, rough: .5,  gnd: 0xb9c9dd },
 };
+SURFACES.satellite = { ...SURFACES.desert, detail: 'desert', sat: true };   // desert underneath until the imagery tiles arrive
+
 function buildDetailTexture(kind) {   // tileable 1024² multiply-texture
   const S = 1024, cv = document.createElement('canvas'); cv.width = cv.height = S; const g = cv.getContext('2d'), rnd = mulberry(7);
   const wrap = (x, y, r, draw) => { for (const ox of [0, x < r ? S : x > S - r ? -S : null]) for (const oy of [0, y < r ? S : y > S - r ? -S : null]) if (ox !== null && oy !== null) draw(x + ox, y + oy); };
@@ -330,7 +356,8 @@ const terrain = { colors: {}, tex: {}, surface: START_SURFACE };
 function setSurface(kind) {
   const P = SURFACES[kind], { geo, mat } = terrain; terrain.surface = kind;
   geo.attributes.color.array.set(terrain.colors[kind] ||= surfaceColors(kind, geo)); geo.attributes.color.needsUpdate = true;
-  mat.map = terrain.tex[kind] ||= buildDetailTexture(kind); mat.roughness = P.rough;
+  const dk = P.detail || kind; mat.map = terrain.tex[dk] ||= buildDetailTexture(dk); mat.roughness = P.rough;
+  uSatOn.value = P.sat ? 1 : 0; if (P.sat) loadSatellite(); document.getElementById('satCredit').hidden = !P.sat;
   HEMI.gndD.set(P.gnd); applyNight(night);
   for (const b of document.querySelectorAll('[data-surface]')) b.setAttribute('aria-pressed', b.dataset.surface === kind);
 }
@@ -346,17 +373,23 @@ function buildTerrain() {
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   geo.setIndex(new THREE.BufferAttribute(idx, 1)); geo.computeVertexNormals();
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, map: buildDetailTexture(START_SURFACE), roughness: 1, metalness: 0 });
-  terrain.geo = geo; terrain.mat = mat; terrain.tex[START_SURFACE] = mat.map;
+  const dk = SURFACES[START_SURFACE].detail || START_SURFACE;
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, map: buildDetailTexture(dk), roughness: 1, metalness: 0 });
+  terrain.geo = geo; terrain.mat = mat; terrain.tex[dk] = mat.map;
   const siteTex = buildSiteTexture();
   mat.onBeforeCompile = sh => {
-    sh.uniforms.uSite = { value: siteTex };
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vSiteUv;')
-      .replace('#include <begin_vertex>', `#include <begin_vertex>\nvSiteUv = vec2((position.x - (${SITE.cx}.0)) / ${2 * SITE.ext}.0 + 0.5, 0.5 - (position.z - (${SITE.cz}.0)) / ${2 * SITE.ext}.0);`);
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D uSite;\nvarying vec2 vSiteUv;')
+    sh.uniforms.uSite = { value: siteTex }; sh.uniforms.uSatOn = uSatOn;
+    SAT.forEach((L, i) => { sh.uniforms['uSat' + i] = L.tex; sh.uniforms['uSatB' + i] = L.box; });
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vSiteUv, vXZ;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>\nvXZ = position.xz; vSiteUv = vec2((position.x - (${SITE.cx}.0)) / ${2 * SITE.ext}.0 + 0.5, 0.5 - (position.z - (${SITE.cz}.0)) / ${2 * SITE.ext}.0);`);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+        uniform sampler2D uSite, uSat0, uSat1, uSat2; uniform vec4 uSatB0, uSatB1, uSatB2; uniform float uSatOn; varying vec2 vSiteUv, vXZ;
+        vec3 satLayer(sampler2D t, vec4 b, vec3 c) {   // b = (west, north, 1/width, 1/height); unloaded tiles are transparent, so the coarser layer shows through
+          vec2 uv = (vXZ - b.xy) * b.zw, e = smoothstep(0.0, 0.02, uv) * smoothstep(1.0, 0.98, uv); vec4 s = texture2D(t, uv); return mix(c, s.rgb, s.a * e.x * e.y); }`)
       .replace('#include <color_fragment>', `#include <color_fragment>
         { vec4 sc = texture2D(uSite, vSiteUv); vec2 e = step(vec2(0.002), vSiteUv) * step(vSiteUv, vec2(0.998));
-          diffuseColor.rgb = mix(diffuseColor.rgb, sc.rgb, sc.a * e.x * e.y); }`);
+          diffuseColor.rgb = mix(diffuseColor.rgb, sc.rgb, sc.a * e.x * e.y); }
+        if (uSatOn > 0.5) diffuseColor.rgb = satLayer(uSat2, uSatB2, satLayer(uSat1, uSatB1, satLayer(uSat0, uSatB0, diffuseColor.rgb)));`);
   };
   const mesh = new THREE.Mesh(geo, mat); mesh.receiveShadow = true; mesh.castShadow = true; return mesh;
 }

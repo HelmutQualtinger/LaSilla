@@ -28,7 +28,7 @@ Then open <http://127.0.0.1:8377/>.
 | Drag upward, past the horizon | Tilt the view up, as far as the zenith; the camera settles on the ground and looks around from there |
 | `W` `A` `S` `D` or arrow keys | Fly |
 | `N` | Day / night |
-| `T` | Cycle ground: meadow, desert, glacier |
+| `T` | Cycle ground: meadow, desert, glacier, satellite |
 | `1` `2` `3` `4` | Toggle clouds, rain, snow, fog (they combine) |
 | `F` | Follow me: ride along behind one of the Teslas; press again to let go |
 | `M` | Music: the sunrise fanfare from Richard Strauss's *Also sprach Zarathustra* (starts by itself with your first click, tap or key press, plays once; `M` stops or restarts it) |
@@ -41,7 +41,7 @@ Click a label, or a name in the list on the left, to fly to that telescope.
 
 On a phone, drag with one finger to orbit, pinch to zoom, drag with two fingers to pan, and tap a label to fly to a telescope. The button at the top left opens the building list; the one at the top right opens the settings menu.
 
-Add flags to the URL to start in a given state, for example `index.html#day`, `#desert`, `#snow` or `#day-desert-fog-still`. The page opens at night on the glacier surface; the flags are `day`, `still` (start without the automatic orbit), `meadow`, `desert`, `glacier`, `clouds`, `rain`, `snow`, `fog` and `mute` (no automatic music).
+Add flags to the URL to start in a given state, for example `index.html#day`, `#desert`, `#snow` or `#day-desert-fog-still`. The page opens at night on the glacier surface; the flags are `day`, `still` (start without the automatic orbit), `meadow`, `desert`, `glacier`, `satellite`, `clouds`, `rain`, `snow`, `fog` and `mute` (no automatic music).
 
 ## What is real and what is not
 
@@ -78,11 +78,13 @@ CC0 cannot cover material that belongs to others. These parts keep their own ter
 | `sky.js` (stars from HYG, galaxies from OpenNGC) | CC BY-SA 4.0 | Attribution; share-alike |
 | `zarathustra.mp3` (Richard Strauss, *Also sprach Zarathustra*, introduction; performed by Kevin MacLeod, incompetech.com) | CC BY 3.0; the composition itself is in the public domain | Attribution |
 | three.js, loaded from a CDN, not included here | MIT | Keep its licence notice if you bundle it |
+| Satellite imagery (Esri World Imagery), loaded from Esri's tile server only when the Satellite surface is chosen, not included or cached here | [Esri terms of use](https://www.esri.com/en-us/legal/terms/full-master-agreement) | Attribution; do not download or redistribute the tiles |
 
 ## Data credits
 
 - Terrain: SRTM, via the Mapzen terrain tiles hosted on AWS.
 - Buildings and roads: © OpenStreetMap contributors, ODbL.
+- Satellite imagery: Esri World Imagery (Esri, Maxar, Earthstar Geographics, and the GIS User Community).
 - Stars: [HYG database](https://github.com/astronexus/HYG-Database) v4.1, CC BY-SA 4.0.
 - Galaxies: [OpenNGC](https://github.com/mattiaverga/OpenNGC), CC BY-SA 4.0. The derived `sky.js` is under the same licence.
 - Music: Richard Strauss, *Also sprach Zarathustra*, introduction, performed by Kevin MacLeod ([incompetech.com](https://incompetech.com)), [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). MP3 from [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Also_Sprach_Zarathustra_-_Einleitung.ogg).
