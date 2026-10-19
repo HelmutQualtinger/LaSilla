@@ -101,10 +101,8 @@
 <script src="sky.js"></script>
 <script type="importmap">
 { "imports": {
-  "three": "https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.webgpu.js",
-  "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.webgpu.js",
-  "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.tsl.js",
-  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/"
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
 </head>
@@ -151,9 +149,7 @@
 </script>
 
 <script type="module">
-import * as THREE from 'three/webgpu';
-import { Fn, uniform, attribute, varying, texture, uv, vec2, vec3, vec4, float, mix, smoothstep, step, max, min, pow, exp, sqrt, abs, sin, cos, asin, atan, dot, length, normalize, floor, fract, mod,
-  positionLocal, positionGeometry, positionWorld, modelWorldMatrix, cameraViewMatrix, cameraProjectionMatrix, cameraPosition, materialColor, vertexColor, diffuseColor } from 'three/tsl';
+import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 const D = window.LASILLA;
@@ -350,19 +346,24 @@ function buildTerrain() {
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   geo.setIndex(new THREE.BufferAttribute(idx, 1)); geo.computeVertexNormals();
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  const mat = new THREE.MeshStandardNodeMaterial({ map: buildDetailTexture(START_SURFACE), roughness: 1, metalness: 0 });
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, map: buildDetailTexture(START_SURFACE), roughness: 1, metalness: 0 });
   terrain.geo = geo; terrain.mat = mat; terrain.tex[START_SURFACE] = mat.map;
   const siteTex = buildSiteTexture();
-  const su = varying(vec2(positionLocal.x.sub(SITE.cx).div(2 * SITE.ext).add(.5), float(.5).sub(positionLocal.z.sub(SITE.cz).div(2 * SITE.ext))));
-  const sc = texture(siteTex, su), e = step(.002, su).mul(step(su, vec2(.998)));   // detail texture x vertex colour, with the site texture (roads, aprons) painted over it
-  mat.colorNode = vec4(mix(materialColor.rgb.mul(vertexColor().rgb), sc.rgb, sc.a.mul(e.x).mul(e.y)), 1);
+  mat.onBeforeCompile = sh => {
+    sh.uniforms.uSite = { value: siteTex };
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vSiteUv;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>\nvSiteUv = vec2((position.x - (${SITE.cx}.0)) / ${2 * SITE.ext}.0 + 0.5, 0.5 - (position.z - (${SITE.cz}.0)) / ${2 * SITE.ext}.0);`);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D uSite;\nvarying vec2 vSiteUv;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        { vec4 sc = texture2D(uSite, vSiteUv); vec2 e = step(vec2(0.002), vSiteUv) * step(vSiteUv, vec2(0.998));
+          diffuseColor.rgb = mix(diffuseColor.rgb, sc.rgb, sc.a * e.x * e.y); }`);
+  };
   const mesh = new THREE.Mesh(geo, mat); mesh.receiveShadow = true; mesh.castShadow = true; return mesh;
 }
 
 // ---------- renderer / scene ----------
 const canvas = document.getElementById('gl');
-const renderer = new THREE.WebGPURenderer({ canvas, antialias: true, powerPreference: 'high-performance', forceWebGL: location.hash.includes('webgl') });   // WebGL 2 fallback where WebGPU is missing
-await renderer.init();
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 const PR = Math.min(devicePixelRatio, MOBILE ? 1.5 : 2); renderer.setPixelRatio(PR);
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
@@ -384,11 +385,17 @@ const starlight = new THREE.DirectionalLight(0x7088c8, 0);                   // 
 scene.add(sun, sun.target, hemi, starlight);
 
 // ---------- materials ----------
-const uGlow = uniform(0), AMBER = 0xffa23c;
+const uGlow = { value: 0 }, AMBER = 0xffa23c;
 function glowify(mat, strength) {    // soft amber uplight, baked per vertex in aGlow
-  mat.emissiveNode = diffuseColor.rgb.mul(vec3(1, .55, .20)).mul(uGlow.mul(attribute('aGlow', 'float')).mul(strength)); return mat;
+  mat.onBeforeCompile = sh => {
+    sh.uniforms.uGlow = uGlow; sh.uniforms.uGlowK = { value: strength };
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aGlow;\nvarying float vGlow;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvGlow = aGlow;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uGlow, uGlowK;\nvarying float vGlow;')
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * vec3(1.0, 0.55, 0.20) * (uGlow * vGlow * uGlowK);`);
+  };
+  return mat;
 }
-const std = (o, s = 1.1) => glowify(new THREE.MeshStandardNodeMaterial(o), s);
+const std = (o, s = 1.1) => glowify(new THREE.MeshStandardMaterial(o), s);
 const M = {
   wall: std({ color: 0xd8c7a6, roughness: .92 }),
   dome: std({ color: 0xf3f2ec, roughness: .45, metalness: .05 }),
@@ -616,75 +623,80 @@ function eqToScene([ex, ey, ez], lst) {      // equatorial unit vector -> scene 
 }
 const galVec = (l, b) => new THREE.Vector3(Math.cos(b * DEG) * Math.cos(l * DEG), Math.cos(b * DEG) * Math.sin(l * DEG), Math.sin(b * DEG));
 const skyU = {
-  uNight: uniform(0), uGalInv: uniform(new THREE.Matrix3()), uSun: uniform(SUN), uMoon: uniform(MOON), uFog: uniform(scene.fog.color), uGray: uniform(0),
-  uFogDay: uniform(FOG_DAY), uFogNight: uniform(FOG_NIGHT),
+  uNight: { value: 0 }, uGalInv: { value: new THREE.Matrix3() }, uSun: { value: SUN }, uMoon: { value: MOON }, uFog: { value: scene.fog.color }, uGray: { value: 0 },
+  uFogDay: { value: FOG_DAY }, uFogNight: { value: FOG_NIGHT }, uMW: { value: null },
 };
-// value noise and fbm on the GPU (TSL), shared by the Milky Way bake and the clouds
-const hash3 = Fn(([p0]) => { const p = fract(p0.mul(.3183099).add(.1)).mul(17); return fract(p.x.mul(p.y).mul(p.z).mul(p.x.add(p.y).add(p.z))); }).setLayout({ name: 'hash3', type: 'float', inputs: [{ name: 'p', type: 'vec3' }] });
-const noise3 = Fn(([x]) => {
-  const i = floor(x), f0 = fract(x), f = f0.mul(f0).mul(f0.mul(-2).add(3)), h = (a, b, c) => hash3(i.add(vec3(a, b, c)));
-  return mix(mix(mix(h(0, 0, 0), h(1, 0, 0), f.x), mix(h(0, 1, 0), h(1, 1, 0), f.x), f.y), mix(mix(h(0, 0, 1), h(1, 0, 1), f.x), mix(h(0, 1, 1), h(1, 1, 1), f.x), f.y), f.z);
-}).setLayout({ name: 'noise3', type: 'float', inputs: [{ name: 'x', type: 'vec3' }] });
-const fbm = Fn(([p0]) => {
-  const p = vec3(p0).toVar(), s = float(0).toVar();
-  for (let i = 0, a = .5; i < 5; i++, a *= .5) { s.addAssign(noise3(p).mul(a)); p.assign(p.mul(2.03).add(vec3(1.7, 9.2, 3.1))); }
-  return s;
-}).setLayout({ name: 'fbm', type: 'float', inputs: [{ name: 'p', type: 'vec3' }] });
 // The Milky Way is procedural but static, so it is rendered once into a galactic-coordinate (l, b) texture; the dome just samples it.
-const gv = (l, b) => { const v = galVec(l, b); return vec3(v.x, v.y, v.z); };
-const LMC = gv(280.47, -32.89), SMC = gv(302.8, -44.3), CARINA = gv(287.6, -0.6), COAL = gv(302.5, -0.6);
-const blob = (g, c, r) => exp(dot(g, c).oneMinus().negate().div(.5 * r * r));
-const milkyWay = g => {
-  const l = atan(g.y, g.x), c = cos(l).mul(.5).add(.5), w = mix(.06, .13, c.mul(c));
-  const b = asin(g.z.clamp(-1, 1)).add(fbm(g.mul(3)).sub(.48).mul(.11));
-  const band = exp(b.mul(b).negate().div(w.mul(w))), halo = exp(abs(b).negate().div(w.mul(2.6)));
-  const bulge = exp(l.mul(l).div(.07).add(b.mul(b).div(.018)).negate());
-  let inten = band.mul(pow(c, 1.5).mul(.8).add(.2)).add(halo.mul(.16).mul(c.mul(.7).add(.3))).mul(smoothstep(.22, .78, fbm(g.mul(6))).mul(1.5).add(.3)).add(bulge.mul(.45));
-  const ln = b.sub(sin(l.mul(3)).mul(.014)).div(w.mul(.36)), lane = exp(ln.mul(ln).negate());
-  const dust = max(smoothstep(.40, .60, fbm(g.mul(11).add(4)).mul(.7).add(fbm(g.mul(27).add(9)).mul(.3))).mul(lane).mul(c.mul(.55).add(.45)), blob(g, COAL, .055).mul(.9));
-  inten = inten.mul(dust.mul(.9).oneMinus()).mul(noise3(g.mul(120)).mul(noise3(g.mul(210))).mul(.5).add(.88));
-  const col = mix(vec3(.60, .71, 1), vec3(1, .83, .60), bulge.mul(1.4).add(c.mul(c).mul(band).mul(.55)).clamp(0, 1)).mul(inten);
-  const tex = fbm(g.mul(34)).mul(.9).add(.5);
-  return col.add(vec3(.72, .80, 1).mul(blob(g, LMC, .085).mul(tex).mul(.34).add(blob(g, SMC, .045).mul(tex).mul(.26)))).add(vec3(1, .45, .55).mul(blob(g, CARINA, .03).mul(.4)));
-};
+const MW_GLSL = `
+    float hash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+    float noise(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x), mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
+                 mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x), mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z); }
+    float fbm(vec3 p){ float a = 0.5, s = 0.0; for (int i = 0; i < 5; i++){ s += a * noise(p); p = p * 2.03 + vec3(1.7, 9.2, 3.1); a *= 0.5; } return s; }
+    float blob(vec3 g, vec3 c, float r){ return exp(-(1.0 - dot(g, c)) / (0.5 * r * r)); }
+    vec3 milkyWay(vec3 g){
+      float l = atan(g.y, g.x), c = 0.5 + 0.5 * cos(l);
+      float w = mix(0.06, 0.13, c * c);
+      float b = asin(clamp(g.z, -1.0, 1.0)) + (fbm(g * 3.0) - 0.48) * 0.11;
+      float band = exp(-b * b / (w * w)), halo = exp(-abs(b) / (w * 2.6));
+      float bulge = exp(-(l * l / 0.07 + b * b / 0.018));
+      float inten = (band * (0.20 + 0.80 * pow(c, 1.5)) + halo * 0.16 * (0.3 + 0.7 * c)) * (0.30 + 1.5 * smoothstep(0.22, 0.78, fbm(g * 6.0))) + bulge * 0.45;
+      float lane = exp(-pow((b - 0.014 * sin(l * 3.0)) / (w * 0.36), 2.0));
+      float dust = smoothstep(0.40, 0.60, fbm(g * 11.0 + 4.0) * 0.7 + fbm(g * 27.0 + 9.0) * 0.3) * lane * (0.45 + 0.55 * c);
+      dust = max(dust, blob(g, uCoal, 0.055) * 0.9);
+      inten *= 1.0 - 0.9 * dust;
+      inten *= 0.88 + 0.5 * noise(g * 120.0) * noise(g * 210.0);
+      vec3 col = mix(vec3(0.60, 0.71, 1.0), vec3(1.0, 0.83, 0.60), clamp(bulge * 1.4 + c * c * band * 0.55, 0.0, 1.0)) * inten;
+      float tex = 0.5 + 0.9 * fbm(g * 34.0);
+      col += vec3(0.72, 0.80, 1.0) * blob(g, uLMC, 0.085) * tex * 0.34 + vec3(0.72, 0.80, 1.0) * blob(g, uSMC, 0.045) * tex * 0.26;
+      col += vec3(1.0, 0.45, 0.55) * blob(g, uCar, 0.03) * 0.4;
+      return col;
+    }
+`;
 function bakeMilkyWay(w) {
-  const rt = new THREE.RenderTarget(w, w / 2, { depthBuffer: false, wrapS: THREE.RepeatWrapping, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: false });
-  const m = new THREE.MeshBasicNodeMaterial({ depthTest: false, fog: false }), l = uv().x.sub(.5).mul(2 * Math.PI), b = uv().y.sub(.5).mul(Math.PI);
-  m.colorNode = vec4(sqrt(milkyWay(vec3(cos(b).mul(cos(l)), cos(b).mul(sin(l)), sin(b))).div(2.5).clamp(0, 1)), 1);   // sqrt-encoded so 8 bits hold the faint outskirts
-  const q = new THREE.QuadMesh(m); renderer.setRenderTarget(rt); q.render(renderer); renderer.setRenderTarget(null); m.dispose(); return rt.texture;
+  const rt = new THREE.WebGLRenderTarget(w, w / 2, { depthBuffer: false, wrapS: THREE.RepeatWrapping, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: false });
+  const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
+    depthTest: false,
+    uniforms: { uLMC: { value: galVec(280.47, -32.89) }, uSMC: { value: galVec(302.8, -44.3) }, uCar: { value: galVec(287.6, -0.6) }, uCoal: { value: galVec(302.5, -0.6) } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+    fragmentShader: `uniform vec3 uLMC, uSMC, uCar, uCoal; varying vec2 vUv; ${MW_GLSL}
+      void main(){ float l = (vUv.x - 0.5) * 6.2831853, b = (vUv.y - 0.5) * 3.1415927;
+        gl_FragColor = vec4(sqrt(clamp(milkyWay(vec3(cos(b) * cos(l), cos(b) * sin(l), sin(b))) / 2.5, 0.0, 1.0)), 1.0); }`,   // sqrt-encoded so 8 bits hold the faint outskirts
+  }));
+  quad.frustumCulled = false; const sc = new THREE.Scene(); sc.add(quad);
+  renderer.setRenderTarget(rt); renderer.render(sc, new THREE.Camera()); renderer.setRenderTarget(null);
+  quad.geometry.dispose(); quad.material.dispose(); return rt.texture;
 }
-const mwTex = bakeMilkyWay(MOBILE ? 2048 : 4096);
-const skyMat = new THREE.MeshBasicNodeMaterial({ side: THREE.BackSide, depthTest: false, depthWrite: false, fog: false });
-skyMat.colorNode = Fn(() => {
-  const { uNight, uGalInv, uSun, uMoon, uFog, uGray, uFogDay, uFogNight } = skyU;
-  const d = normalize(positionLocal), h = max(d.y, 0);
-  const col = mix(uFogDay, mix(vec3(.004, .030, .20), vec3(.0008, .008, .075), h), exp(h.mul(-11)).oneMinus()).toVar();   // thin air at 2400 m: haze only at the horizon, deep blue above
-  const s = max(dot(d, uSun), 0);
-  col.addAssign(vec3(1, .92, .75).mul(smoothstep(.99985, .99996, s).mul(9).add(pow(s, 400).mul(.8)).add(pow(s, 10).mul(.16))));
-  const g = uGalInv.mul(d), e = texture(mwTex, vec2(atan(g.y, g.x).div(2 * Math.PI).add(.5), asin(g.z.clamp(-1, 1)).div(Math.PI).add(.5))).rgb;
-  const nt = mix(uFogNight, vec3(.0018, .0034, .009), pow(h, .4)).add(e.mul(e).mul(2.5).mul(smoothstep(-.02, .28, d.y).mul(.92).add(.08)).mul(.40)).toVar();
-  const mn = max(dot(d, uMoon), 0);                                       // moon disc, glare and a faint moonlit veil
-  nt.addAssign(vec3(.80, .87, 1).mul(smoothstep(.99986, .99991, mn).mul(5).add(pow(mn, 1200).mul(.5)).add(pow(mn, 40).mul(.05)).add(pow(mn, 4).mul(.006))));
-  col.assign(mix(col, nt, uNight));
-  const az = max(dot(normalize(d.xz), normalize(uSun.xz)), 0);
-  col.addAssign(vec3(1, .40, .12).mul(uNight.mul(uNight.oneMinus()).mul(4)).mul(exp(h.mul(-4.5))).mul(az.mul(az).mul(.8).add(.2)).mul(.55));
-  return vec4(mix(col, uFog, max(uGray, smoothstep(-.03, 0, d.y).oneMinus())), 1);
-})();
-const skyDome = new THREE.Mesh(new THREE.SphereGeometry(1000, 64, 32), skyMat);
+skyU.uMW.value = bakeMilkyWay(MOBILE ? 2048 : 4096);
+const skyDome = new THREE.Mesh(new THREE.SphereGeometry(1000, 64, 32), new THREE.ShaderMaterial({
+  uniforms: skyU, side: THREE.BackSide, depthTest: false, depthWrite: false,
+  vertexShader: `varying vec3 vDir; void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform float uNight, uGray; uniform mat3 uGalInv; uniform vec3 uSun, uMoon, uFog, uFogDay, uFogNight; uniform sampler2D uMW; varying vec3 vDir;
+    vec3 milkyWay(vec3 g){ vec3 e = texture2D(uMW, vec2(atan(g.y, g.x) / 6.2831853 + 0.5, asin(clamp(g.z, -1.0, 1.0)) / 3.1415927 + 0.5)).rgb; return e * e * 2.5; }
+    void main(){
+      vec3 d = normalize(vDir); float h = max(d.y, 0.0);
+      vec3 col = mix(uFogDay, mix(vec3(0.004, 0.030, 0.20), vec3(0.0008, 0.008, 0.075), h), 1.0 - exp(-h * 11.0));          // thin air at 2400 m: haze only at the horizon, deep blue above
+      float s = max(dot(d, uSun), 0.0);
+      col += vec3(1.0, 0.92, 0.75) * (smoothstep(0.99985, 0.99996, s) * 9.0 + pow(s, 400.0) * 0.8 + pow(s, 10.0) * 0.16);
+      if (uNight > 0.001){
+        vec3 nt = mix(uFogNight, vec3(0.0018, 0.0034, 0.009), pow(h, 0.4));
+        nt += milkyWay(uGalInv * d) * (0.08 + 0.92 * smoothstep(-0.02, 0.28, d.y)) * 0.40;
+        float mn = max(dot(d, uMoon), 0.0);                                  // moon disc, glare and a faint moonlit veil
+        nt += vec3(0.80, 0.87, 1.0) * (smoothstep(0.99986, 0.99991, mn) * 5.0 + pow(mn, 1200.0) * 0.5 + pow(mn, 40.0) * 0.05 + pow(mn, 4.0) * 0.006);
+        col = mix(col, nt, uNight);
+        float az = max(dot(normalize(d.xz), normalize(uSun.xz)), 0.0);
+        col += 4.0 * uNight * (1.0 - uNight) * vec3(1.0, 0.40, 0.12) * exp(-h * 4.5) * (0.2 + 0.8 * az * az) * 0.55;
+      }
+      col = mix(col, uFog, max(uGray, smoothstep(0.0, -0.03, d.y)));
+      gl_FragColor = vec4(col, 1.0);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`,
+}));
 skyDome.renderOrder = -10; skyDome.frustumCulled = false; scene.add(skyDome);
 
-// stars, galaxies and snowflakes are screen-aligned quads (WebGPU only draws 1-pixel points): each point becomes four vertices, spread out by aCorner in the vertex shader
-const uRes = uniform(new THREE.Vector2(1, 1)), corner = attribute('aCorner', 'vec2');   // drawing-buffer size in pixels
-function sprites(n, attrs) {
-  const g = new THREE.BufferGeometry(), C = new Float32Array(n * 8), I = new Uint32Array(n * 6);
-  for (const [name, sz, src] of attrs) { const a = new Float32Array(n * 4 * sz); for (let i = 0; i < n; i++) for (let c = 0; c < 4; c++) for (let k = 0; k < sz; k++) a[(i * 4 + c) * sz + k] = src[i * sz + k]; g.setAttribute(name, new THREE.BufferAttribute(a, sz)); }
-  for (let i = 0; i < n; i++) { C.set([-1, -1, 1, -1, 1, 1, -1, 1], i * 8); I.set([0, 1, 2, 0, 2, 3].map(v => v + 4 * i), i * 6); }
-  g.setAttribute('aCorner', new THREE.BufferAttribute(C, 2)); g.setIndex(new THREE.BufferAttribute(I, 1)); return g;
-}
-const spriteClip = (clip, px) => clip.add(vec4(corner.mul(px).div(uRes).mul(clip.w), 0, 0));   // px = full width in pixels, like gl_PointSize
-const skyMaterial = o => Object.assign(new THREE.MeshBasicNodeMaterial({ blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false, fog: false, side: THREE.DoubleSide }), o);   // opaque queue: drawn right after the dome, behind everything
-
-const starU = { uScale: uniform(1500), uAspect: uniform(1), uClear: uniform(1), uNight: uniform(0), uTime: uniform(0), uPR: uniform(PR) };
+const starU = { uScale: { value: 1500 }, uAspect: { value: 1 }, uClear: { value: 1 }, uNight: { value: 0 }, uTime: { value: 0 }, uPR: { value: PR } };
 function buildStars() {
   // real sky: stars from the HYG catalogue, galaxies from OpenNGC, constellation figures (see tools/build_sky.py); positions are converted from RA/Dec to the galactic frame
   const K = window.LASILLA_SKY, rnd = mulberry(1977), P = [], C = [], S = [], Ph = [];
@@ -698,13 +710,21 @@ function buildStars() {
     P.push(g[0] * 900, g[1] * 900, g[2] * 900); C.push(...bvColor(dv.getUint8(i * 6 + 5) / 100 - .5)); Ph.push(rnd());
     S.push(Math.min(9.5, 1.15 + .55 * Math.pow(m, 1.25)), mag < 6.5 ? Math.min(2.4, .4 + .32 * m) : .4 * Math.pow(10, -.4 * (mag - 6.5)));
   }
-  const { uNight, uTime, uPR, uClear, uScale, uAspect } = starU, wp = modelWorldMatrix.mul(vec4(positionGeometry, 1)), dir = normalize(wp.xyz.sub(cameraPosition)), PV = cameraProjectionMatrix.mul(cameraViewMatrix);
-  const fade = smoothstep(-.01, .2, dir.y).mul(uClear).mul(smoothstep(.35, 1, uNight));   // below the horizon, overcast, daylight
-  const aSI = attribute('aSI', 'vec2'), aPhase = attribute('aPhase', 'float');
-  const tw = float(1).sub(smoothstep(.1, .7, dir.y).oneMinus().mul(.3).add(.12).mul(sin(uTime.mul(aPhase.mul(4).add(2)).add(aPhase.mul(60))).mul(.5).add(.5)));
-  const vCol = varying(attribute('aColor', 'vec3').mul(aSI.y.mul(fade).mul(tw))), sd = length(corner);
-  const pts = new THREE.Mesh(sprites(K.stars.n, [['position', 3, P], ['aColor', 3, C], ['aSI', 2, S], ['aPhase', 1, Ph]]), skyMaterial({
-    vertexNode: spriteClip(PV.mul(wp), aSI.x.mul(uPR)), colorNode: vec4(vCol.mul(max(exp(sd.mul(sd).mul(-5)).sub(.0067), 0)), 1),
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); geo.setAttribute('aColor', new THREE.Float32BufferAttribute(C, 3));
+  geo.setAttribute('aSI', new THREE.Float32BufferAttribute(S, 2)); geo.setAttribute('aPhase', new THREE.Float32BufferAttribute(Ph, 1));
+  const pts = new THREE.Points(geo, new THREE.ShaderMaterial({
+    uniforms: starU, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false,   // opaque queue: drawn right after the dome, behind everything
+    vertexShader: `attribute vec3 aColor; attribute vec2 aSI; attribute float aPhase; uniform float uNight, uTime, uPR, uClear; varying vec3 vCol;
+      void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vec3 dir = normalize(wp.xyz - cameraPosition);
+        float ext = smoothstep(-0.01, 0.2, dir.y);
+        float tw = 1.0 - (0.12 + 0.3 * (1.0 - smoothstep(0.1, 0.7, dir.y))) * (0.5 + 0.5 * sin(uTime * (2.0 + aPhase * 4.0) + aPhase * 60.0));
+        vCol = aColor * (aSI.y * ext * tw * uClear * smoothstep(0.35, 1.0, uNight));
+        gl_Position = projectionMatrix * viewMatrix * wp; gl_PointSize = aSI.x * uPR; }`,
+    fragmentShader: `varying vec3 vCol; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; float a = max(exp(-d * d * 5.0) - 0.0067, 0.0);
+      gl_FragColor = vec4(vCol * a, 1.0);
+      #include <colorspace_fragment>
+    }`,
   }));
   pts.frustumCulled = false; pts.renderOrder = -9;
   // galaxies: soft ellipses at their catalogue size, axis ratio and position angle (the two Magellanic Clouds are drawn by the Milky Way texture instead)
@@ -717,21 +737,37 @@ function buildStars() {
     GP.push(g[0] * 900, g[1] * 900, g[2] * 900); GA.push(...GAL.map(r => r[0] * ax[0] + r[1] * ax[1] + r[2] * ax[2]));
     GG.push(maj / 60 * DEG, ratio, clamp(1.6 - .1 * mag, .4, 1.2));
   }
-  const aG = attribute('aG', 'vec3'), c0 = PV.mul(wp), c1 = PV.mul(wp.add(modelWorldMatrix.mul(vec4(attribute('aAxis', 'vec3').mul(9), 0))));
-  const s = c1.xy.div(c1.w).sub(c0.xy.div(c0.w)).mul(vec2(uAspect, 1)), vAx = varying(s.div(max(length(s), 1e-6)));   // major axis on screen
-  const vR = varying(aG.y), vB = varying(aG.z.mul(fade));
-  const al = dot(corner, vAx), ac = dot(corner, vec2(vAx.y.negate(), vAx.x)).div(vR), ga = max(exp(al.mul(al).add(ac.mul(ac)).mul(-4.5)).sub(.011), 0).mul(2.6);
-  const gal = new THREE.Mesh(sprites(GP.length / 3, [['position', 3, GP], ['aAxis', 3, GA], ['aG', 3, GG]]), skyMaterial({
-    vertexNode: spriteClip(c0, aG.x.mul(uScale).mul(4.5).clamp(uPR.mul(11), 300)), colorNode: vec4(vec3(1, .40, .28).mul(ga.mul(vB)), 1),
+  const gg = new THREE.BufferGeometry();
+  gg.setAttribute('position', new THREE.Float32BufferAttribute(GP, 3)); gg.setAttribute('aAxis', new THREE.Float32BufferAttribute(GA, 3)); gg.setAttribute('aG', new THREE.Float32BufferAttribute(GG, 3));
+  const gal = new THREE.Points(gg, new THREE.ShaderMaterial({
+    uniforms: starU, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false,
+    vertexShader: `attribute vec3 aAxis, aG; uniform float uNight, uClear, uPR, uScale, uAspect; varying vec2 vAx; varying float vR, vB;
+      void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vec3 dir = normalize(wp.xyz - cameraPosition);
+        vec4 c0 = projectionMatrix * viewMatrix * wp, c1 = projectionMatrix * viewMatrix * (wp + vec4(mat3(modelMatrix) * aAxis * 9.0, 0.0));
+        vec2 s = c1.xy / c1.w - c0.xy / c0.w; s.x *= uAspect; vAx = s / max(length(s), 1e-6);            // major axis on screen
+        vR = aG.y; vB = aG.z * smoothstep(-0.01, 0.2, dir.y) * uClear * smoothstep(0.35, 1.0, uNight);
+        gl_Position = c0; gl_PointSize = clamp(aG.x * uScale * 4.5, 11.0 * uPR, 300.0); }`,
+    fragmentShader: `varying vec2 vAx; varying float vR, vB; void main(){ vec2 q = (gl_PointCoord - 0.5) * 2.0; q.y = -q.y;
+      float al = dot(q, vAx), ac = dot(q, vec2(-vAx.y, vAx.x)) / vR, a = max(exp(-(al * al + ac * ac) * 4.5) - 0.011, 0.0) * 2.6;
+      gl_FragColor = vec4(vec3(1.0, 0.40, 0.28) * (a * vB), 1.0);
+      #include <colorspace_fragment>
+    }`,
   }));
   gal.frustumCulled = false; gal.renderOrder = -9;
   // constellation figures: faint red lines between the catalogue positions of their stars
   const LP = [];
   for (let i = 0; i < K.lines.length; i += 2) { const g = eqToGal(K.lines[i] * DEG, K.lines[i + 1] * DEG); LP.push(g[0] * 900, g[1] * 900, g[2] * 900); }
   const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(LP, 3));
-  const lm = new THREE.LineBasicNodeMaterial({ blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false, fog: false });
-  lm.colorNode = vec4(vec3(.30, .03, .025).mul(varying(smoothstep(-.01, .2, normalize(positionWorld.sub(cameraPosition)).y).mul(uClear).mul(smoothstep(.35, 1, uNight)))), 1);
-  const fig = new THREE.LineSegments(lg, lm);
+  const fig = new THREE.LineSegments(lg, new THREE.ShaderMaterial({
+    uniforms: starU, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false,
+    vertexShader: `uniform float uNight, uClear; varying float vB;
+      void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vec3 dir = normalize(wp.xyz - cameraPosition);
+        vB = smoothstep(-0.01, 0.2, dir.y) * uClear * smoothstep(0.35, 1.0, uNight);
+        gl_Position = projectionMatrix * viewMatrix * wp; }`,
+    fragmentShader: `varying float vB; void main(){ gl_FragColor = vec4(vec3(0.30, 0.03, 0.025) * vB, 1.0);
+      #include <colorspace_fragment>
+    }`,
+  }));
   fig.frustumCulled = false; fig.renderOrder = -9;
   const both = new THREE.Group(); both.add(fig, pts, gal); return both;
 }
@@ -746,43 +782,63 @@ function orientSky() {
 
 // ---------- weather: clouds, rain, snow, fog ----------
 const wx = { clouds: 0, rain: 0, snow: 0, fog: 0 }, wxTarget = { ...wx };
-const cloudU = { uNight: skyU.uNight, uTime: starU.uTime, uCover: uniform(0), uDark: uniform(0), uSun: skyU.uSun, uMoon: skyU.uMoon, uFog: skyU.uFog };
-const cloudMat = new THREE.MeshBasicNodeMaterial({ side: THREE.BackSide, depthTest: false, depthWrite: false, fog: false,
-  blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor });   // blended but kept in the opaque queue, so it draws over the stars and under the scene; alpha untouched, the canvas is see-through
-cloudMat.colorNode = Fn(() => {
-  const { uNight, uTime, uCover, uDark, uSun, uMoon, uFog } = cloudU;
-  const d = normalize(positionLocal), p = d.xz.div(max(d.y, 0).add(.10));     // flat cloud layer seen in perspective
-  const q = vec3(p.mul(.5).add(vec2(.010, .004).mul(uTime)), uTime.mul(.008));
-  const n = fbm(q).mul(.75).add(fbm(q.mul(2.7).add(5)).mul(.25));
-  const th = mix(.74, .20, uCover), dens = smoothstep(th, th.add(.20), n), thick = smoothstep(th, th.add(.48), n);
-  const lit = pow(max(dot(d, mix(uSun, uMoon, step(.5, uNight))), 0), 6).mul(thick.oneMinus());
-  const day = mix(vec3(1, .99, .96), vec3(.50, .54, .62), thick).mul(mix(1, .42, uDark)).add(vec3(1, .9, .7).mul(lit.mul(.35)));
-  const ngt = mix(vec3(.050, .060, .085), vec3(.012, .015, .022), thick).mul(mix(1, .6, uDark)).add(vec3(.5, .6, .8).mul(lit.mul(.22)));
-  return vec4(mix(uFog, mix(day, ngt, uNight), smoothstep(0, .22, d.y)), dens.mul(smoothstep(0, .05, d.y)));   // far clouds sink into the haze
-})();
-const cloudDome = new THREE.Mesh(new THREE.SphereGeometry(1000, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2), cloudMat);
+const cloudU = { uNight: skyU.uNight, uTime: starU.uTime, uCover: { value: 0 }, uDark: { value: 0 }, uSun: { value: SUN }, uMoon: { value: MOON }, uFog: { value: scene.fog.color } };
+const cloudDome = new THREE.Mesh(new THREE.SphereGeometry(1000, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.ShaderMaterial({
+  uniforms: cloudU, side: THREE.BackSide, depthTest: false, depthWrite: false,
+  blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor,   // blended but kept in the opaque queue, so it draws over the stars and under the scene
+  vertexShader: `varying vec3 vDir; void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform float uNight, uTime, uCover, uDark; uniform vec3 uSun, uMoon, uFog; varying vec3 vDir;
+    float hash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+    float noise(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x), mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
+                 mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x), mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z); }
+    float fbm(vec3 p){ float a = 0.5, s = 0.0; for (int i = 0; i < 5; i++){ s += a * noise(p); p = p * 2.03 + vec3(1.7, 9.2, 3.1); a *= 0.5; } return s; }
+    void main(){
+      vec3 d = normalize(vDir);
+      vec2 p = d.xz / (max(d.y, 0.0) + 0.10);                                  // flat cloud layer seen in perspective
+      vec3 q = vec3(p * 0.5 + uTime * vec2(0.010, 0.004), uTime * 0.008);
+      float n = fbm(q) * 0.75 + fbm(q * 2.7 + 5.0) * 0.25;
+      float th = mix(0.74, 0.20, uCover), dens = smoothstep(th, th + 0.20, n), thick = smoothstep(th, th + 0.48, n);
+      float lit = pow(max(dot(d, mix(uSun, uMoon, step(0.5, uNight))), 0.0), 6.0) * (1.0 - thick);
+      vec3 day = mix(vec3(1.0, 0.99, 0.96), vec3(0.50, 0.54, 0.62), thick) * mix(1.0, 0.42, uDark) + vec3(1.0, 0.9, 0.7) * lit * 0.35;
+      vec3 ngt = mix(vec3(0.050, 0.060, 0.085), vec3(0.012, 0.015, 0.022), thick) * mix(1.0, 0.6, uDark) + vec3(0.5, 0.6, 0.8) * lit * 0.22;
+      vec3 col = mix(uFog, mix(day, ngt, uNight), smoothstep(0.0, 0.22, d.y));  // far clouds sink into the haze
+      gl_FragColor = vec4(col, dens * smoothstep(0.0, 0.05, d.y));
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`,
+}));
 cloudDome.renderOrder = -8; cloudDome.frustumCulled = false; cloudDome.visible = false; scene.add(cloudDome);
 
 // rain and snow fall inside a box that wraps around the camera
-const fallU = { uTime: starU.uTime, uBox: uniform(new THREE.Vector3(120, 80, 120)), uVel: uniform(new THREE.Vector3(2.5, -26, 1)), uRain: uniform(0), uSnow: uniform(0), uTint: uniform(new THREE.Color()), uScale: uniform(1500) };
-const wrap = (p, box) => mod(p.sub(cameraPosition).add(box.mul(.5)), box).sub(box.mul(.5)).add(cameraPosition);
+const fallU = { uTime: starU.uTime, uBox: { value: new THREE.Vector3(120, 80, 120) }, uVel: { value: new THREE.Vector3(2.5, -26, 1) }, uRain: { value: 0 }, uSnow: { value: 0 }, uTint: { value: new THREE.Color() }, uScale: { value: 1500 } };
+const WRAP = `vec3 wrap(vec3 p, vec3 box){ return mod(p - cameraPosition + box * 0.5, box) - box * 0.5 + cameraPosition; }`;
 function boxPoints(n, per, seed) {
   const rnd = mulberry(seed), P = new Float32Array(n * per * 3), E = new Float32Array(n * per), S = new Float32Array(n * per), b = fallU.uBox.value;
   for (let i = 0; i < n; i++) { const x = rnd() * b.x, y = rnd() * b.y, z = rnd() * b.z, sd = rnd(); for (let k = 0; k < per; k++) { const j = i * per + k; P.set([x, y, z], j * 3); E[j] = k; S[j] = sd; } }
-  return [P, E, S];
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('aEnd', new THREE.BufferAttribute(E, 1)); g.setAttribute('aSeed', new THREE.BufferAttribute(S, 1)); return g;
 }
-const [RP, RE, RS] = boxPoints(8000, 2, 11), rg = new THREE.BufferGeometry();
-rg.setAttribute('position', new THREE.BufferAttribute(RP, 3)); rg.setAttribute('aEnd', new THREE.BufferAttribute(RE, 1)); rg.setAttribute('aSeed', new THREE.BufferAttribute(RS, 1));
-const aSeed = attribute('aSeed', 'float'), rk = aSeed.mul(.4).add(.8), PV = cameraProjectionMatrix.mul(cameraViewMatrix);
-const rain = new THREE.LineSegments(rg, Object.assign(new THREE.LineBasicNodeMaterial({ transparent: true, depthWrite: false, fog: false }), {
-  vertexNode: PV.mul(vec4(wrap(positionGeometry.add(fallU.uVel.mul(fallU.uTime).mul(rk)), fallU.uBox).add(fallU.uVel.mul(attribute('aEnd', 'float').mul(.045).mul(rk))), 1)),   // streak = 45 ms of fall
-  colorNode: vec4(fallU.uTint.mul(vec3(.78, .84, .95)), fallU.uRain.mul(.42)),
+const rain = new THREE.LineSegments(boxPoints(8000, 2, 11), new THREE.ShaderMaterial({
+  uniforms: fallU, transparent: true, depthWrite: false,
+  vertexShader: `attribute float aEnd, aSeed; uniform float uTime; uniform vec3 uBox, uVel; ${WRAP}
+    void main(){ float k = 0.8 + 0.4 * aSeed; vec3 p = wrap(position + uVel * uTime * k, uBox) + aEnd * uVel * 0.045 * k;   // streak = 45 ms of fall
+      gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0); }`,
+  fragmentShader: `uniform float uRain; uniform vec3 uTint; void main(){ gl_FragColor = vec4(uTint * vec3(0.78, 0.84, 0.95), 0.42 * uRain);
+    #include <colorspace_fragment>
+  }`,
 }));
-const [SP, , SS] = boxPoints(11000, 1, 23), st = fallU.uTime, sp = positionGeometry.add(vec3(sin(st.mul(.7).add(aSeed.mul(30))).mul(1.2).add(st.mul(1.3)), st.mul(aSeed.mul(1.7).add(1.5)).negate(), cos(st.mul(.5).add(aSeed.mul(17))).mul(1.2)));   // fall, drift and flutter
-const smv = cameraViewMatrix.mul(vec4(wrap(sp, fallU.uBox), 1)), sd = length(corner);
-const snow = new THREE.Mesh(sprites(11000, [['position', 3, SP], ['aSeed', 1, SS]]), Object.assign(new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide }), {
-  vertexNode: spriteClip(cameraProjectionMatrix.mul(smv), aSeed.mul(.07).add(.06).mul(fallU.uScale).div(smv.z.negate()).clamp(2, 22)),
-  colorNode: vec4(fallU.uTint, smoothstep(.25, 1, sd).oneMinus().mul(varying(smoothstep(30, 58, smv.z.negate()).oneMinus())).mul(.9).mul(fallU.uSnow)),
+const snow = new THREE.Points(boxPoints(11000, 1, 23), new THREE.ShaderMaterial({
+  uniforms: fallU, transparent: true, depthWrite: false,
+  vertexShader: `attribute float aSeed; uniform float uTime, uScale; uniform vec3 uBox; varying float vA; ${WRAP}
+    void main(){ vec3 p = position; p.y -= uTime * (1.5 + aSeed * 1.7);
+      p.x += sin(uTime * 0.7 + aSeed * 30.0) * 1.2 + uTime * 1.3; p.z += cos(uTime * 0.5 + aSeed * 17.0) * 1.2;   // drift and flutter
+      vec4 mv = viewMatrix * vec4(wrap(p, uBox), 1.0); gl_Position = projectionMatrix * mv;
+      gl_PointSize = clamp((0.06 + aSeed * 0.07) * uScale / -mv.z, 2.0, 22.0); vA = smoothstep(58.0, 30.0, -mv.z); }`,
+  fragmentShader: `uniform float uSnow; uniform vec3 uTint; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0;
+    gl_FragColor = vec4(uTint, smoothstep(1.0, 0.25, d) * vA * 0.9 * uSnow);
+    #include <colorspace_fragment>
+  }`,
 }));
 for (const o of [rain, snow]) { o.frustumCulled = false; o.visible = false; o.renderOrder = 5; scene.add(o); }
 const GRAY = new THREE.Color(), GRAY_DAY = new THREE.Color().setRGB(.62, .65, .70), GRAY_NIGHT = new THREE.Color().setRGB(.030, .034, .044);
@@ -926,11 +982,11 @@ function updateLabels(w, h) {
     s.el.style.visibility = show ? '' : 'hidden';
   }
 }
-function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); renderer.getDrawingBufferSize(uRes.value); camera.aspect = w / h; baseFov = w < h ? 68 : 52; /* wider lens in portrait */ zoomSky(1); }
+function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; baseFov = w < h ? 68 : 52; /* wider lens in portrait */ zoomSky(1); }
 
 // ---------- go ----------
-const timer = new THREE.Timer(), needle = document.querySelector('#compass i');
-function frame(t) { timer.update(t); tick(Math.min(timer.getDelta(), .1)); requestAnimationFrame(frame); }
+const clock = new THREE.Clock(), needle = document.querySelector('#compass i');
+function frame() { tick(Math.min(clock.getDelta(), .1)); requestAnimationFrame(frame); }
 function tick(dt) {
   starU.uTime.value += dt;
   let dirty = night !== nightTarget; night = clamp(night + Math.sign(nightTarget - night) * dt / 2.4, 0, 1);
